@@ -9,8 +9,9 @@
     <title>Famalio</title>
     <link rel="stylesheet" href="./wizard.css">
     <link rel="stylesheet" href="./calendar.css">
-    <script src="./wizard.js" defer></script>
+    <script src="./wizard.js" type="module"></script>
     <script src="./workspace.js" defer></script>
+    <script src="./setup-panel.js" type="module"></script>
     <script src="./calendar.js" type="module"></script>
   </head>
   <body>
@@ -23,93 +24,133 @@
         </nav>
         <a class="ha-link" href="/config/automation/dashboard" target="_top">HA-Automationen <span aria-hidden="true">↗</span></a>
       </header>
+      <div id="pending-banner" class="pending-banner" role="status" aria-live="polite" hidden><span class="pending-text"><strong>Home Assistant wartet auf dich.</strong> Öffne die Famalio-App: Einstellungen → Famalio Home → Home-Server verbinden → Verbindungsanfragen → <em>Verbindung erlauben</em>. Der Code muss gleich sein:</span><strong id="pending-code" class="pending-code"></strong></div>
       <main id="calendar-workspace" hidden tabindex="-1" aria-label="Familienkalender"></main>
       <main id="settings-workspace" class="shell" tabindex="-1">
-        <header class="page-header"><div><p class="eyebrow">EINSTELLUNGEN</p><h1>Ihr Zuhause verbinden</h1><p class="lede">Zugriff, App und Kalenderfreigabe an einem Ort.</p></div></header>
-      <nav class="step-nav" aria-label="Einrichtungsschritte">
-        <a href="#step-network-title"><span>1</span>Zugriff</a>
-        <a href="#step-app-title"><span>2</span>Famalio-App</a>
-        <a href="#step-ha-title"><span>3</span>Home Assistant</a>
-      </nav>
-      <div id="global-status" class="status-banner" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span id="global-status-text">Verbindungsstatus wird geprüft …</span></div>
+        <header class="page-header">
+          <p class="eyebrow" id="progress-label">SCHRITT 1 VON 3</p>
+          <h1 id="page-title">Zugang einrichten</h1>
+          <p class="lede next-action" id="next-action">Wir prüfen, was schon erledigt ist …</p>
+        </header>
+        <nav class="step-nav" aria-label="Fortschritt">
+          <a href="#step-network-title" data-nav="1"><span>1</span>Zugang</a>
+          <a href="#step-app-title" data-nav="2"><span>2</span>Famalio-App</a>
+          <a href="#step-ha-title" data-nav="3"><span>3</span>Home Assistant</a>
+        </nav>
+        <div id="global-status" class="status-banner" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span id="global-status-text">Verbindungsstatus wird geprüft …</span></div>
 
-      <section class="step-card" aria-labelledby="step-network-title">
-        <div class="step-heading"><span class="step-number">1</span><div><p class="eyebrow">ZUGRIFF WÄHLEN</p><h2 id="step-network-title">Wie soll die App den Server erreichen?</h2></div></div>
-        <div class="choice-grid">
-          <article class="choice" id="choice-tailscale">
-            <div class="choice-title"><h3>Tailscale</h3><span class="badge recommended">Empfohlen</span></div>
-            <p>Ein privates Netzwerk für Ihre Geräte. Für jedes Mobilgerät wird die Tailscale-App im selben Tailnet benötigt. Tailscale Serve stellt HTTPS bereit; der Assistent öffnet keine Router-Ports.</p>
-            <button class="button primary" id="choose-tailscale" type="button">Tailscale verwenden</button>
-          </article>
-          <article class="choice" id="choice-proxy">
-            <div class="choice-title"><h3>Vorhandenes HTTPS</h3><span class="badge">Erweitert</span></div>
-            <p>Für eine bereits betriebene Domain und einen vorhandenen Reverse-Proxy mit öffentlich vertrauenswürdigem HTTPS-Zertifikat. Sie konfigurieren Proxy und DNS selbst.</p>
-            <label for="proxy-origin">HTTPS-Adresse der App</label>
-            <input id="proxy-origin" type="url" inputmode="url" autocomplete="url" placeholder="https://home.example.net" spellcheck="false">
-            <button class="button secondary" id="choose-proxy" type="button">Vorhandenes HTTPS verwenden</button>
-            <p class="fine-print">Der Assistent richtet weder einen externen Router noch Ihren Reverse-Proxy ein. Verwenden Sie nur die bestehende, von außen erreichbare HTTPS-Adresse.</p>
-          </article>
-        </div>
-        <div class="inline-status" id="network-status" aria-live="polite"></div>
-        <div class="action-row hidden" id="network-actions">
-          <a class="button primary hidden" id="tailscale-login" href="#" target="_blank" rel="noopener noreferrer">Bei Tailscale anmelden</a>
-          <button class="button secondary hidden" id="retry-network" type="button">Erneut prüfen</button>
-        </div>
-        <details class="proxy-help" id="proxy-help">
-          <summary>Hinweise zur Reverse-Proxy-Konfiguration</summary>
-          <p>Wenn Sie „Vorhandenes HTTPS“ wählen, leitet Ihr Reverse-Proxy zur vollständigen Famalio-API im internen Add-on-Netz weiter:</p>
-          <div class="copy-row hidden" id="proxy-upstream-row"><code id="proxy-upstream" class="origin-value">Wird nach Auswahl angezeigt</code><button class="button small secondary" id="copy-upstream" type="button" disabled>Upstream kopieren</button></div>
-          <p class="fine-print" id="proxy-upstream-unavailable">Der interne API-Upstream wird nach Auswahl von „Vorhandenes HTTPS“ angezeigt.</p>
-          <p>Der Upstream ist nur für den internen Netzwerkpfad zwischen Home Assistant und Add-on gedacht. Veröffentlichen Sie Port 8787 nicht direkt im LAN oder Internet. DNS, öffentliche HTTPS-Zertifikate und den externen Proxy richten Sie selbst ein.</p>
-          <p>Prüfen Sie anschließend hier die Origin und Serveridentität.</p>
-          <p>Wenn Sie DNS, gültiges HTTPS oder Proxy-Regeln erst einrichten müssen, wählen Sie zunächst Tailscale oder richten Sie diese Infrastruktur außerhalb dieses Assistenten ein.</p>
-        </details>
-      </section>
+        <section id="restart-card" class="step-card restart-card hidden" aria-live="polite">
+          <h2>Home Assistant muss einmal neu starten</h2>
+          <p>Famalio hat seinen Teil für Home Assistant installiert. Damit er benutzt werden kann, muss Home Assistant neu starten. Das dauert etwa ein bis zwei Minuten. Danach geht es hier von selbst weiter.</p>
+          <button class="button primary big" id="restart-ha" type="button">Home Assistant neu starten</button>
+          <p class="inline-status" id="restart-status"></p>
+          <button class="button small secondary hidden" id="restart-skip" type="button">Ich habe Home Assistant schon neu gestartet</button>
+        </section>
 
-      <section class="step-card" aria-labelledby="step-app-title">
-        <div class="step-heading"><span class="step-number">2</span><div><p class="eyebrow">FAMALIO APP</p><h2 id="step-app-title">App verbinden</h2></div></div>
-        <p>Öffnen Sie Famalio, um Home oder ein weiteres Gerät ausdrücklich einzurichten.</p>
-        <div class="copy-row"><code id="app-origin" class="origin-value">Wird nach der Netzwerkprüfung angezeigt</code><button class="button small secondary" id="copy-origin" type="button" disabled>Adresse kopieren</button></div>
-        <div class="note-box" id="app-guide-note"></div>
-        <div class="management-links">
-          <a class="text-link hidden" target="_top" id="addon-management">Add-on verwalten <span aria-hidden="true">↗</span></a>
-        </div>
-        <p class="inline-status" id="app-status" aria-live="polite"></p>
-        <p class="fine-print">Home ist ein eigener Server. Ihre bestehende Cloud-Familie bleibt unverändert.</p>
-      </section>
-
-      <section class="step-card" aria-labelledby="step-ha-title">
-        <div class="step-heading"><span class="step-number">3</span><div><p class="eyebrow">HOME ASSISTANT</p><h2 id="step-ha-title">Integration freigeben</h2></div></div>
-        <p id="ha-intro">Ein Klick genügt: Home Assistant fragt die Verbindung an, Sie bestätigen den Code in der Famalio App, und diese Seite richtet die Integration selbst ein.</p>
-        <div class="connect-card" id="ha-connect">
-          <button class="button primary" id="request-ha" type="button">Mit Famalio verbinden</button>
-          <div class="pairing-code hidden" id="ha-code-box" aria-live="polite">
-            <span class="eyebrow">BESTÄTIGUNGSCODE</span>
-            <strong id="ha-code">····-····</strong>
-            <span class="fine-print" id="ha-code-hint">Famalio öffnen → Einstellungen → Home Assistant → Anfrage bestätigen. Dort können Sie auch das Bearbeiten erlauben.</span>
+        <section class="step-card" id="step-1" aria-labelledby="step-network-title">
+          <div class="step-heading"><span class="step-number">1</span><div><h2 id="step-network-title">Schritt 1: Zugang einrichten</h2></div></div>
+          <p class="step-summary" id="sum-1"></p>
+          <div class="step-body">
+            <p class="lead">Damit dein Handy deinen Famalio-Server auch unterwegs sicher erreicht, brauchen wir einen privaten Zugang. Dafür nutzen wir Tailscale (kostenlos). Tippe einfach auf den Knopf.</p>
+            <div class="action-row">
+              <button class="button primary big" id="choose-tailscale" type="button">Zugang einrichten</button>
+              <a class="button primary big hidden" id="tailscale-login" href="#" target="_blank" rel="noopener noreferrer">Bei Tailscale anmelden</a>
+              <button class="button secondary hidden" id="retry-network" type="button">Erneut prüfen</button>
+            </div>
+            <div class="action-row hidden" id="network-actions"></div>
+            <div class="inline-status big-status" id="network-status" aria-live="polite"></div>
+            <p class="fine-print" id="tailscale-hint">Wenn sich ein neues Fenster öffnet: Melde dich bei Tailscale an (ein Konto ist kostenlos) und komm danach hierher zurück. Diese Seite geht von selbst weiter.</p>
+            <details class="proxy-help" id="proxy-help">
+              <summary>Erweitert: eigene HTTPS-Adresse verwenden</summary>
+              <div id="choice-proxy">
+                <p>Nur für Fortgeschrittene: Du betreibst schon eine Domain mit Reverse-Proxy und gültigem HTTPS-Zertifikat. Dann gib hier die Adresse ein. Sonst bleib bei „Zugang einrichten“.</p>
+                <label for="proxy-origin">HTTPS-Adresse</label>
+                <input id="proxy-origin" type="url" inputmode="url" autocomplete="url" placeholder="https://home.example.net" spellcheck="false">
+                <button class="button secondary" id="choose-proxy" type="button">Diese Adresse verwenden</button>
+                <p class="fine-print">Der Assistent richtet weder Router noch Reverse-Proxy ein. Leite den Proxy auf den unter „Technische Details“ gezeigten internen Upstream.</p>
+              </div>
+            </details>
           </div>
-          <ol class="connect-steps" id="ha-steps">
-            <li data-step="request">Anfrage senden</li>
-            <li data-step="approve">In der App bestätigen</li>
-            <li data-step="confirm">Integration einrichten</li>
-          </ol>
-        </div>
-        <details class="proxy-help" id="ha-manual">
-          <summary>Stattdessen mit Integrationstoken verbinden</summary>
-          <form id="ha-form" autocomplete="off">
-            <label for="integration-token">Integrationstoken</label>
-            <div class="secret-row"><input id="integration-token" name="integration-token" type="password" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="fhi_…"><button class="button secondary" id="discover-ha" type="submit">Verbinden</button></div>
-          </form>
-          <p class="fine-print" id="ha-hint">Der Token wird nur für diese Anfrage verwendet und danach aus dem Feld entfernt.</p>
-        </details>
-        <div class="inline-status" id="ha-status" aria-live="polite"></div>
-        <div class="management-links">
-          <a class="text-link hidden" target="_top" id="integration-management">Integration in Home Assistant verwalten <span aria-hidden="true">↗</span></a>
-        </div>
-      </section>
+        </section>
 
-      <footer class="footer"><span id="database-status">Datenbankstatus wird geprüft …</span><button class="button small secondary" id="refresh" type="button">Status aktualisieren</button></footer>
-      <p class="visually-hidden" id="announcer" aria-live="polite"></p>
+        <section class="step-card" id="step-2" aria-labelledby="step-app-title">
+          <div class="step-heading"><span class="step-number">2</span><div><h2 id="step-app-title">Schritt 2: Famalio-App verbinden</h2></div></div>
+          <p class="step-summary" id="sum-2"></p>
+          <div class="step-body">
+            <p class="lead" id="app-guide-note">Warte auf Schritt 1.</p>
+            <div id="app-setup-data" class="hidden">
+              <div class="bigfield">
+                <span class="eyebrow">ADRESSE DEINES SERVERS</span>
+                <div class="copy-row"><code id="app-origin" class="origin-value huge-text">–</code><button class="button secondary" id="copy-origin" type="button" disabled>Kopieren</button></div>
+              </div>
+              <div class="bigfield" id="setup-code-field">
+                <span class="eyebrow">EINRICHTUNGSCODE (EINMALIG GÜLTIG)</span>
+                <div class="copy-row"><code id="setup-code" class="origin-value huge-code">–</code><button class="button secondary" id="copy-code" type="button" disabled>Kopieren</button></div>
+              </div>
+              <p class="inline-status bad hidden" id="code-expired">Der Einrichtungscode ist abgelaufen. Starte das Famalio-Add-on unter „Technische Details → Add-on verwalten“ einmal neu, dann erscheint hier ein neuer Code.</p>
+              <div class="qr-layout">
+                <div class="qr-box" id="qr-box"><svg id="qr-code" role="img" aria-label="QR-Code mit Serveradresse und Einrichtungscode" shape-rendering="crispEdges" viewBox="0 0 10 10"><rect width="100%" height="100%" fill="#fff"/><path id="qr-path" fill="#000" d=""/></svg></div>
+                <ol class="big-steps">
+                  <li>Öffne die <strong>Famalio-App</strong> auf deinem Handy.</li>
+                  <li>Tippe auf <strong>Einstellungen → Famalio Home → Home-Server verbinden</strong>.</li>
+                  <li>Tippe auf <strong>Einrichtungscode scannen</strong> und halte die Kamera auf den QR-Code. Oder tippe Adresse und Code von Hand ein.</li>
+                  <li>Tippe auf <strong>Home-Familie erstellen</strong> und speichere den angezeigten Wiederherstellungscode gut.</li>
+                </ol>
+              </div>
+            </div>
+            <p class="inline-status big-status" id="app-status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="step-card" id="step-3" aria-labelledby="step-ha-title">
+          <div class="step-heading"><span class="step-number">3</span><div><h2 id="step-ha-title">Schritt 3: Home Assistant verbinden</h2></div></div>
+          <p class="step-summary" id="sum-3"></p>
+          <div class="step-body">
+            <p class="lead" id="ha-intro">Tippe auf den Knopf. Du bekommst einen Code, den du in der Famalio-App bestätigst. Mehr ist nicht nötig.</p>
+            <div class="connect-card" id="ha-connect">
+              <button class="button primary big" id="request-ha" type="button">Mit Famalio verbinden</button>
+              <div class="pairing-code hidden" id="ha-code-box" aria-live="polite">
+                <span class="eyebrow">DEIN VERBINDUNGSCODE</span>
+                <strong id="ha-code">····-····</strong>
+                <ol class="big-steps" id="ha-code-hint">
+                  <li>Öffne die <strong>Famalio-App</strong>.</li>
+                  <li>Tippe auf <strong>Einstellungen → Famalio Home → Home-Server verbinden → Verbindungsanfragen</strong>.</li>
+                  <li>Prüfe, dass dort derselbe Code steht, und tippe auf <strong>Verbindung erlauben</strong>.</li>
+                </ol>
+              </div>
+              <ol class="connect-steps" id="ha-steps">
+                <li data-step="request">Anfrage senden</li>
+                <li data-step="approve">In der App bestätigen</li>
+                <li data-step="confirm">Verbunden</li>
+              </ol>
+            </div>
+            <div class="inline-status big-status" id="ha-status" aria-live="polite"></div>
+            <details class="proxy-help" id="ha-manual">
+              <summary>Erweitert: mit Integrationstoken verbinden</summary>
+              <form id="ha-form" autocomplete="off">
+                <label for="integration-token">Integrationstoken</label>
+                <div class="secret-row"><input id="integration-token" name="integration-token" type="password" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="fhi_…"><button class="button secondary" id="discover-ha" type="submit">Verbinden</button></div>
+              </form>
+              <p class="fine-print" id="ha-hint">Der Token wird nur für diese Anfrage verwendet und danach aus dem Feld entfernt.</p>
+            </details>
+          </div>
+        </section>
+
+        <details class="proxy-help tech" id="tech-details">
+          <summary>Technische Details</summary>
+          <p class="fine-print" id="tech-integration"></p>
+          <details class="proxy-help" id="proxy-upstream-help">
+            <summary>Reverse-Proxy-Upstream</summary>
+            <div class="copy-row hidden" id="proxy-upstream-row"><code id="proxy-upstream" class="origin-value">Wird nach Auswahl angezeigt</code><button class="button small secondary" id="copy-upstream" type="button" disabled>Upstream kopieren</button></div>
+            <p class="fine-print" id="proxy-upstream-unavailable">Der interne API-Upstream wird nach Auswahl von „Erweitert: eigene HTTPS-Adresse“ angezeigt. Veröffentliche Port 8787 nie direkt im LAN oder Internet.</p>
+          </details>
+          <div class="management-links">
+            <a class="text-link hidden" target="_top" id="addon-management">Add-on verwalten <span aria-hidden="true">↗</span></a>
+            <a class="text-link hidden" target="_top" id="integration-management">Integration in Home Assistant verwalten <span aria-hidden="true">↗</span></a>
+          </div>
+          <footer class="footer"><span id="database-status">Datenbankstatus wird geprüft …</span><button class="button small secondary" id="refresh" type="button">Status aktualisieren</button></footer>
+        </details>
+        <p class="visually-hidden" id="announcer" aria-live="polite"></p>
       </main>
     </div>
   </body>

@@ -13,7 +13,7 @@
 #   ghcr.io/home-assistant/{aarch64|amd64}-base-debian:<version>
 # NODE_IMAGE must be pinned by digest for a release (TODO, see ../README.md).
 ARG BUILD_ARCH=amd64
-ARG BUILD_VERSION=0.3.0
+ARG BUILD_VERSION=0.4.0
 ARG BUILD_FROM=ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:bookworm
 ARG NODE_IMAGE=node:22-bookworm-slim
 # Official Tailscale image; only its two static binaries are copied (userspace
@@ -80,6 +80,8 @@ COPY --chown=root:root server/package.json ./package.json
 COPY --chown=root:root server/src ./src
 COPY --chown=root:root server/sql ./sql
 COPY --chown=root:root wizard/ /opt/famalio-wizard/
+# Bundled Home Assistant integration; copied into /homeassistant/custom_components on start.
+COPY --chown=root:root integration/ /opt/famalio-integration/famalio/
 COPY rootfs /
 RUN chmod 0755 /etc/s6-overlay/scripts/*.sh \
  && find /etc/s6-overlay/s6-rc.d \( -name run -o -name finish \) -exec chmod 0755 {} +

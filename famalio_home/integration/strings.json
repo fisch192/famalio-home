@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Famalio Home",
+        "description": "Use an HTTPS server address and an integration token created by a Famalio family owner.",
+        "data": {
+          "url": "HTTPS server address",
+          "api_key": "Integration token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Renew Famalio Home access",
+        "description": "Create a new integration token in Famalio and enter it here.",
+        "data": {
+          "url": "HTTPS server address",
+          "api_key": "New integration token"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Connect the Famalio calendar",
+        "description": "The installation assistant prepared access to {url}. Confirm to add this calendar. An existing connection to the same family will be updated."
+      }
+    },
+    "error": {
+      "invalid_url": "Enter an HTTPS origin without a path.",
+      "invalid_auth": "The integration token is invalid or revoked.",
+      "server_changed": "This token belongs to a different Famalio family or server. Remove this entry and add the other server separately.",
+      "cannot_connect": "Could not connect or the server returned an invalid response."
+    },
+    "abort": {
+      "already_configured": "This Famalio integration is already configured.",
+      "reauth_successful": "Famalio Home access was renewed.",
+      "invalid_discovery": "The installation assistant supplied invalid connection information.",
+      "already_in_progress": "A connection to this family is already being configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Calendar refresh interval",
+        "description": "How often Home Assistant checks Famalio Home for calendar changes. Choose from 30 to 3600 seconds.",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  }
+}

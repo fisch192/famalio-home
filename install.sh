@@ -704,6 +704,13 @@ print_summary() {
   if [ -n "$code" ]; then
     printf ' Owner setup code: %s%s%s\n' "$C_B" "$code" "$C_0"
     printf '                   single use, valid 30 minutes after the server started.\n'
+    if [ -n "$url" ] && command -v qrencode >/dev/null 2>&1; then
+      enc_url="$(printf '%s' "$url" | sed 's/:/%3A/g; s#/#%2F#g')"
+      printf '\n Scan this QR code in the Famalio app (Scan setup code):\n\n'
+      qrencode -t ANSIUTF8 -m 2 "famalio://home-setup?url=${enc_url}&code=${code}" || true
+    else
+      printf '                   (Install "qrencode" to get a QR code here that the app can scan.)\n'
+    fi
   else
     printf ' Owner setup code: none printed (an owner already exists, or the server was\n'
     printf '                   not restarted). While no owner exists, get a fresh code with:\n'
@@ -714,9 +721,11 @@ print_summary() {
 
  Next steps in the Famalio app (phone):
    1. Settings -> Famalio Home -> Home server connection
-   2. Enter the server address and tap "Check connection".
+   2. Tap "Scan setup code" and scan the QR code above, or enter the server
+      address and tap "Check connection".
    3. Expand "Set up a new Home family": your display name, family name and the
-      server setup code above, then tap "Create Home family".
+      server setup code above (already filled in after scanning), then tap
+      "Create Home family".
    4. Write down the recovery code the app shows once.
 
  Files:

@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { chmodSync, closeSync, fsyncSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import http from 'node:http';
 import https from 'node:https';
 import type { AddressInfo } from 'node:net';
@@ -7,6 +8,28 @@ import { loadConfig, type Config } from './config.ts';
 import { createPool } from './db.ts';
 import { listener } from './http.ts';
 import { compactJournal } from './records.ts';
+
+/**
+ * Hands the one-time owner setup code to a co-located process (the Home Assistant add-on's
+ * setup panel) through a file in a directory only that process's group can read. It is never
+ * served over HTTP. With no code (an owner exists) a stale file is removed.
+ */
+export function publishSetupCode(file: string | undefined, code: string | null, ttlSeconds: number): void {
+  if (!file) return;
+  try {
+    if (!code) { unlinkSync(file); return; }
+    const temp = `${file}.${process.pid}.tmp`;
+    const fd = openSync(temp, 'w', 0o640);
+    try {
+      writeFileSync(fd, `${JSON.stringify({ code, expires_at: new Date(Date.now() + ttlSeconds * 1000).toISOString() })}\n`);
+      fsyncSync(fd);
+    } finally { closeSync(fd); }
+    chmodSync(temp, 0o640);
+    renameSync(temp, file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT' || code) console.error(JSON.stringify({ event: 'setup_code_file_failed', dir: dirname(file) }));
+  }
+}
 
 export async function start(config: Config, log: (line: object) => void = (l) => console.log(JSON.stringify(l))) {
   const db = createPool(config.databaseUrl);
@@ -19,6 +42,7 @@ export async function start(config: Config, log: (line: object) => void = (l) =>
   server.requestTimeout = 60_000;
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));
   const setupCode = await auth.createSetupCodeIfUnclaimed();
+  publishSetupCode(process.env.FAMALIO_SETUP_CODE_FILE, setupCode, config.setupTtlSeconds);
   const retentionSeconds = config.tombstoneRetentionDays * 86_400;
   const compact = async () => {
     try {

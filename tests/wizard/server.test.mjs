@@ -8,6 +8,8 @@ import { pathToFileURL } from 'node:url';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'famalio-wizard-'));
 process.env.NODE_ENV = 'test';
 process.env.FAMALIO_SETUP_DIR = dir;
+const codeFile = path.join(dir, 'owner-setup.json');
+process.env.FAMALIO_SETUP_CODE_FILE = codeFile;
 const wizard = await import(pathToFileURL(path.resolve('famalio_home/wizard/server.mjs')).href + `?test=${Date.now()}`);
 
 test('ingress is restricted to the Supervisor proxy peer; forwarding metadata grants nothing', () => {
@@ -144,4 +146,31 @@ test('relay exposes only scoped HA calendar reads and event writes', () => {
 test('connection requests need a verified network before contacting the server', async () => {
   await assert.rejects(() => wizard.requestConnection(), /network|discovery/i);
   assert.equal(wizard.runtime.request, null);
+});
+
+test('owner setup code is exposed to the panel only while setup is required, verified and unexpired', () => {
+  const code = 'fhs_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v';
+  const ready = { phase: 'ready', verified: true };
+  fs.writeFileSync(codeFile, JSON.stringify({ code, expires_at: new Date(Date.now() + 3600_000).toISOString() }));
+  assert.equal(wizard.readSetupCode().code, code);
+  assert.deepEqual(wizard.appSetup(true, ready), { setup_required: true, setup_code: code, setup_code_expired: false });
+  assert.equal(wizard.appSetup(false, ready).setup_code, null, 'hidden once an owner exists');
+  assert.equal(wizard.appSetup(null, ready).setup_code, null);
+  assert.equal(wizard.appSetup(true, { phase: 'ready', verified: false }).setup_code, null, 'hidden until the address is verified');
+  fs.writeFileSync(codeFile, JSON.stringify({ code, expires_at: new Date(Date.now() - 1000).toISOString() }));
+  assert.deepEqual(wizard.appSetup(true, ready), { setup_required: true, setup_code: null, setup_code_expired: true });
+  fs.writeFileSync(codeFile, JSON.stringify({ code: 'fhi_not-a-setup-code-at-all-0000', expires_at: new Date(Date.now() + 3600_000).toISOString() }));
+  assert.equal(wizard.readSetupCode(), null);
+  fs.rmSync(codeFile);
+  assert.equal(wizard.readSetupCode(), null);
+});
+
+test('integration install status is validated before it reaches the panel', () => {
+  const file = path.join(dir, 'integration.json');
+  assert.equal(wizard.readIntegrationStatus(), null);
+  fs.writeFileSync(file, JSON.stringify({ state: 'installed', bundled_version: '0.4.0', installed_version: '0.4.0' }));
+  assert.deepEqual(wizard.readIntegrationStatus(), { state: 'installed', bundled_version: '0.4.0', installed_version: '0.4.0' });
+  fs.writeFileSync(file, JSON.stringify({ state: 'rm -rf', bundled_version: '0.4.0' }));
+  assert.equal(wizard.readIntegrationStatus(), null);
+  fs.rmSync(file);
 });

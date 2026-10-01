@@ -13,6 +13,11 @@ const CONFIG = path.join(DATA, 'config.json');
 const TS_STATUS = path.join(DATA, 'tailscale-status.json');
 const CERT = path.join(DATA, 'https.crt');
 const KEY = path.join(DATA, 'https.key');
+const INTEGRATION_STATUS = path.join(DATA, 'integration.json');
+// Written by the API process (famalio_app) into a directory only this process's group can read.
+// It is shown in this admin-only panel and never sent through the relay or the public API.
+const SETUP_CODE_FILE = process.env.FAMALIO_SETUP_CODE_FILE || '/data/setup-code/owner-setup.json';
+const setupCodeRe = /^fhs_[A-Za-z0-9_-]{16,128}$/;
 const APP_INFO = 'http://127.0.0.1:8787/v1/info';
 const MAX_JSON = 16 * 1024;
 const COOKIE = 'famalio_wizard';
@@ -22,6 +27,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const tokenRe = /^fhi_[A-Za-z0-9_-]{32,512}$/;
 
 function readJson(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } }
+/** The one-time owner setup code, or null when absent, malformed or expired. */
+function readSetupCode() {
+  const c = readJson(SETUP_CODE_FILE);
+  if (!c || typeof c.code !== 'string' || !setupCodeRe.test(c.code)) return null;
+  const expires = Date.parse(c.expires_at);
+  if (!Number.isFinite(expires)) return null;
+  return { code: c.code, expired: expires <= Date.now(), expires_at: new Date(expires).toISOString() };
+}
+/** Result of the add-on's integration auto-install (famalio-integration.sh). */
+function readIntegrationStatus() {
+  const s = readJson(INTEGRATION_STATUS);
+  const states = ['installed', 'updated', 'current', 'newer', 'unavailable'];
+  if (!s || !states.includes(s.state)) return null;
+  const v = (x) => (typeof x === 'string' && x.length <= 40 ? x : null);
+  return { state: s.state, bundled_version: v(s.bundled_version), installed_version: v(s.installed_version) };
+}
 function safeDNS(value) { return typeof value === 'string' && value.length < 254 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.ts\.net$/.test(value); }
 function safeAuthURL(value) {
   try { const u = new URL(value); return u.protocol === 'https:' && u.hostname === 'login.tailscale.com' && !u.username && !u.password && u.pathname.startsWith('/a/') && !u.search && !u.hash ? u.href : null; } catch { return null; }
@@ -195,7 +216,17 @@ async function getStatus() {
   if (network.mode === 'reverse_proxy') network.proxy_upstream = proxyUpstream(alias);
   return { csrf_token: null, database: db, network,
     home_assistant: { ...runtime.ha, internal_url: network.mode === 'tailscale' && alias ? `https://${alias}:9443` : null,
-      tls_server_name: network.mode === 'tailscale' ? (ts?.self_dns_name || null) : null, request: publicRequest() }, app: { setup_required: ownerSetup }, management: managementURLs(alias), capabilities: { reverse_proxy: true } };
+      tls_server_name: network.mode === 'tailscale' ? (ts?.self_dns_name || null) : null, request: publicRequest() }, app: appSetup(ownerSetup, network), integration: readIntegrationStatus(), management: managementURLs(alias), capabilities: { reverse_proxy: true } };
+}
+function appSetup(ownerSetup, network) {
+  const app = { setup_required: ownerSetup, setup_code: null, setup_code_expired: false };
+  // Only while the owner does not exist yet, and only once the HTTPS address is verified.
+  if (ownerSetup === true && network.phase === 'ready' && network.verified === true) {
+    const c = readSetupCode();
+    if (c && !c.expired) app.setup_code = c.code;
+    else if (c) app.setup_code_expired = true;
+  }
+  return app;
 }
 function setSession(req, res) {
   const match = (req.headers.cookie || '').match(/(?:^|;\s*)famalio_wizard=([a-f0-9]{64})/);
@@ -321,7 +352,7 @@ async function pollConnection() {
 }
 function staticFile(req, res, pathname) {
   const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
-  const allowed = new Set(['index.html', 'wizard.js', 'wizard.css', 'workspace.js', 'calendar.js', 'calendar.css', 'calendar-helpers.js']);
+  const allowed = new Set(['index.html', 'wizard.js', 'wizard.css', 'workspace.js', 'calendar.js', 'calendar.css', 'calendar-helpers.js', 'setup-helpers.js', 'setup-panel.js', 'qrcode-vendor.js']);
   if (!allowed.has(rel)) return send(res, 404, { message: 'Not found.' });
   const file = path.join(ROOT, 'public', rel);
   try { const data = fs.readFileSync(file); const type = rel.endsWith('.js') ? 'text/javascript; charset=utf-8' : rel.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8'; res.writeHead(200, { 'content-type': type, 'content-length': data.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'", 'referrer-policy': 'no-referrer' }); res.end(data); } catch { send(res, 404, { message: 'Not found.' }); }
@@ -422,4 +453,4 @@ if (process.env.NODE_ENV !== 'test') {
   }, 5000).unref();
 }
 
-export { handle, relayRoute, requestConnection, pollConnection, runtime, configureNetwork, doCheck, getStatus, validPublicOrigin, safeAuthURL, atomicJSON, verifyURL, validateGrant, aliasFromSlug, proxyUpstream, managementURLs, ingress, originOK, requireCSRF, MAX_JSON };
+export { readSetupCode, readIntegrationStatus, appSetup, handle, relayRoute, requestConnection, pollConnection, runtime, configureNetwork, doCheck, getStatus, validPublicOrigin, safeAuthURL, atomicJSON, verifyURL, validateGrant, aliasFromSlug, proxyUpstream, managementURLs, ingress, originOK, requireCSRF, MAX_JSON };

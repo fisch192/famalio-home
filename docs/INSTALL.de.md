@@ -2,177 +2,244 @@
 
 Englische Anleitung: [README.md](../README.md)
 
-> **Status: experimentell, Version 0.3.0.** Geprüft: Der amd64-Build läuft auf
-> Home Assistant OS (Datenbank, Migrationen, Besitzer-Einrichtung, Kopplung,
-> Kalender anlegen/lesen/ändern/löschen, gezielte HA-Lesezugriffe, Neustart,
-> Cold-Backup). **Noch nicht geprüft:** der `aarch64`-Build, die Wiederherstellung
-> eines Backups, Dauerlast und der komplette Ablauf (Tailscale-HTTPS,
-> Reverse-Proxy, Ein-Klick-Verbindung) auf einer frischen Fremdinstallation.
-> Der Linux-Installer wird bei jeder Änderung automatisch getestet (Ubuntu komplett,
-> Erkennung auf Debian, Fedora, Rocky, Alma, openSUSE, Arch, Alpine); ein echtes
-> Let's-Encrypt-Zertifikat und eine echte Tailscale-Anmeldung damit sind ungetestet.
-> Behalte die normale Famalio-Synchronisierung bei; dies soll nicht deine einzige
-> Kopie sein.
+**Famalio Home** ist ein kleiner Server, der den Famalio-Familienkalender **bei dir zu Hause** speichert,
+auf einem Gerät, das dir gehört, statt in der Famalio-Cloud. Du installierst ihn einmal; danach
+synchronisieren die Famalio-Apps deiner Familie mit ihm. Mit Home Assistant erscheinen deine Kalender
+auch dort und können Automationen auslösen.
 
-## 1. Voraussetzungen
+**Du brauchst**
 
-- Home Assistant OS oder Supervised mit Add-on-Store (Einstellungen → Add-ons;
-  in den neuesten Versionen heißen Add-ons „Apps“).
-- Prozessor `amd64` (getestet) oder `aarch64` (Build ungetestet), ca. 1 GB freier
-  Arbeitsspeicher und einige GB Speicher. Das Add-on wird beim Installieren
-  **auf deinem Home Assistant gebaut**: Internet nötig, dauert einige Minuten.
-- Die Famalio-App mit gekauftem **Famalio Home** (in der App:
+- Die **Famalio-App** (iPhone oder Android) mit gekauftem **Famalio Home** (in der App:
   **Einstellungen → Famalio Home**).
-- Ein HTTPS-Zugang für die Handys:
-  - kostenloses [Tailscale](https://tailscale.com)-Konto (empfohlen) und die
-    Tailscale-App auf jedem Handy, **oder**
-  - ein vorhandener HTTPS-Reverse-Proxy mit öffentlichem Namen und öffentlich
-    vertrauenswürdigem Zertifikat.
+- **Einen Ort für den Server**: ein **Home-Assistant-OS-Gerät** (am einfachsten) **oder** einen
+  **Linux-Rechner** (Mini-PC, Raspberry Pi 4/5 mit 64-Bit-System, NAS oder gemieteter Server).
+- Etwa 20 Minuten und ein kostenloses [Tailscale](https://tailscale.com)-Konto (ein privater, sicherer
+  Weg vom Handy zum Server; die Einrichtung führt dich hindurch).
 
-## 2. Add-on-Repository hinzufügen
+## Welcher Weg ist meiner?
 
-Klicke auf den Button:
+| Du hast … | Dann … | Dauer |
+|---|---|---|
+| Home Assistant OS (Raspberry Pi, Mini-PC, Home Assistant Green/Yellow, VM) | [Installation auf Home Assistant](#installation-auf-home-assistant) | ca. 15 Minuten |
+| Einen Linux-Rechner ohne Home Assistant | [Ohne Home Assistant](#ohne-home-assistant-linux-server-mit-einem-befehl) (ein Befehl) | ca. 15 Minuten |
+| Eine ältere Test-Installation (lokales Add-on 0.2.0) | [Umzug von einer älteren Installation](#umzug-von-einer-älteren-lokalen-add-on-installation) | ca. 10 Minuten |
+
+> **Status: experimentell, Version 0.4.0.** Geprüft: Der amd64-Build läuft auf Home Assistant OS
+> (Datenbank, Migrationen, Besitzer-Einrichtung, Kopplung, Kalender anlegen/lesen/ändern/löschen,
+> gezielte HA-Lesezugriffe, Neustart, Cold-Backup). Der Linux-Installer wird bei jeder Änderung
+> automatisch getestet. **Auf echter Hardware noch nicht geprüft:** die neue automatische
+> Installation der Integration und der Neustart-Knopf aus Version 0.4.0, der `aarch64`-Build, die
+> Wiederherstellung eines Home-Assistant-Backups und eine echte Tailscale-Anmeldung mit dem Installer.
+> Behalte die normale Famalio-Synchronisierung bei; dies soll nicht deine einzige Kopie sein.
+
+## Installation auf Home Assistant
+
+Das Add-on erledigt das Schwierige selbst: Es richtet die Datenbank ein, installiert die
+Home-Assistant-Integration und führt dich in einer eigenen Seite, dem **Famalio-Panel**, in drei Schritten
+durch die Einrichtung. In den neuesten Home-Assistant-Versionen heißen Add-ons „Apps“; die Schritte sind
+gleich.
+
+Voraussetzungen: Home Assistant OS oder Supervised mit Add-on-Store (`amd64` getestet, `aarch64`
+ungetestet), ca. 1 GB freier Arbeitsspeicher, einige GB Speicher und Internet (das Add-on wird beim
+ersten Mal auf deinem Home Assistant gebaut, das dauert einige Minuten).
+
+### Schritt 1. Repository hinzufügen
+
+Klicke auf den Button (er öffnet deinen Home Assistant):
 
 [![Repository zu meinem Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Ffisch192%2Ffamalio-home)
 
-oder manuell:
+und bestätige mit **Hinzufügen**. Oder von Hand: **Einstellungen → Add-ons → Add-on-Store**, oben rechts
+**⋮ → Repositories**, `https://github.com/fisch192/famalio-home` einfügen, **Hinzufügen**, **Schließen**.
 
-1. **Einstellungen → Add-ons → Add-on-Store**.
-2. Oben rechts **⋮ → Repositories**.
-3. `https://github.com/fisch192/famalio-home` einfügen, **Hinzufügen**, **Schließen**.
+*Du siehst jetzt* unten im Add-on-Store einen neuen Bereich **Famalio Home** mit dem Add-on **Famalio**
+(Seite neu laden, falls er fehlt).
 
-## 3. Add-on installieren und starten
+### Schritt 2. Installieren und starten
 
-1. Im Add-on-Store ganz nach unten zu **Famalio Home** scrollen (Seite ggf. neu laden) und **Famalio** öffnen.
-2. **Installieren** klicken und warten, bis der lokale Build fertig ist (einige Minuten).
-3. **Beim Start ausführen** einschalten, dann **Starten**.
-4. **Weboberfläche öffnen** oder in der Seitenleiste **Famalio** wählen. Fehlt der Eintrag: auf der Add-on-Seite **In Seitenleiste anzeigen** aktivieren.
+1. **Famalio** öffnen und **Installieren** klicken. Warten, bis der Bau fertig ist (einige Minuten).
+2. **Beim Booten starten** und **In Seitenleiste anzeigen** einschalten, dann **Starten**.
 
-## 4. HTTPS-Zugang wählen
+*Du siehst jetzt* das laufende Add-on (grüner **Stoppen**-Knopf) und **Famalio** in der linken Seitenleiste.
 
-Der Assistent auf der Famalio-Seite fragt danach, sobald die Datenbank bereit ist.
+### Schritt 3. Famalio-Panel öffnen und Zugang einrichten
 
-**Tailscale (empfohlen)**
+1. In der Seitenleiste auf **Famalio** klicken. Die Seite zeigt **Schritt 1 von 3 – Zugang einrichten**.
+2. Auf den großen Knopf **Zugang einrichten** klicken. Es erscheint **Bei Tailscale anmelden**.
+3. Anklicken, bei Tailscale anmelden (ein kostenloses Konto genügt) und das neue Gerät bestätigen.
+   Dann zurück zur Famalio-Seite.
+4. Zeigt das Panel **HTTPS in Tailscale aktivieren**, anklicken, auf der Tailscale-Seite
+   **HTTPS Certificates** (DNS-Seite) einschalten und zurückkehren.
 
-1. **Tailscale** wählen und den Anmeldelink im Assistenten anklicken.
-2. Bei Tailscale anmelden und das neue Gerät bestätigen (Standardname `famalio-home`).
-3. Falls Tailscale danach fragt: **HTTPS-Zertifikate** für dein Tailnet aktivieren
-   (Tailscale-Admin-Konsole → DNS → HTTPS Certificates).
-4. Warten, bis der Assistent eine grüne Adresse wie `https://famalio-home.<dein-tailnet>.ts.net`
-   anzeigt. Das ist deine **Serveradresse**.
-5. Auf jedem Handy die Tailscale-App installieren und im selben Tailnet anmelden.
+*Du siehst jetzt* ein grünes Feld **Schritt 1: Zugang einrichten** mit einer Adresse wie
+`https://famalio-home.<dein-tailnet>.ts.net`. Das ist deine **Serveradresse**; das Panel geht von selbst
+weiter. Es werden keine Router-Ports geöffnet.
 
-Es sind weder Portfreigaben am Router noch Funnel oder Subnetz-Routen nötig oder aktiv.
+Eigene Domain oder Reverse-Proxy statt Tailscale? In Schritt 1 **Erweitert: eigene HTTPS-Adresse
+verwenden** öffnen (Details unten bei Linux: „HTTPS-Zugang: welche Variante?“).
 
-**Vorhandener HTTPS-Reverse-Proxy (fortgeschritten)**
+### Schritt 4. Home Assistant neu starten, wenn das Panel fragt
 
-1. **Reverse-Proxy** wählen und deine HTTPS-Adresse eintragen (z. B. `https://famalio.example.org`).
-2. Den Upstream deines Proxys auf den im Assistenten angezeigten internen Hostnamen samt Port
-   setzen (bei Repository-Installationen mit Hash-Präfix, etwa `xxxxxxxx-famalio-home:8787`;
-   aus dem Assistenten kopieren).
-3. Der Assistent prüft Zertifikat und Famalio-Instanz. Klartext-HTTP und selbstsignierte
-   Zertifikate werden abgelehnt. Keinen Port am Host oder Router freigeben.
+Das Add-on hat die Famalio-Integration in den Konfigurationsordner von Home Assistant kopiert (HACS ist
+nicht nötig). Home Assistant muss einmal neu starten, um sie zu laden. Das Panel zeigt **Home Assistant
+muss einmal neu starten** mit einem Knopf.
 
-## 5. Famalio-App verbinden (Besitzer-Einrichtung)
+1. **Home Assistant neu starten** klicken.
+2. Ein bis zwei Minuten warten, die Seite nicht schließen.
 
-1. In Home Assistant das Add-on öffnen, Reiter **Protokoll** (Log). Beim ersten Start wird ein
-   einmaliger **Setup-Code** ausgegeben (30 Minuten gültig, nur einmal verwendbar). Ist er
-   abgelaufen, das Add-on neu starten (nur solange noch kein Besitzer existiert).
-2. In der Famalio-App: **Einstellungen → Famalio Home → Home-Server verbinden**
-   (erscheint, sobald dein Home-Kauf freigeschaltet ist).
-3. **HTTPS-Serveradresse** aus Schritt 4 eintragen und **Verbindung prüfen** tippen.
-4. **Neue Home-Familie einrichten** aufklappen: **Dein Anzeigename**, **Familienname** und den
-   **Server-Einrichtungscode** eingeben, dann **Home-Familie erstellen**.
-5. Die App zeigt jetzt **einmalig einen Wiederherstellungscode**. Schreibe ihn auf und
-   bewahre ihn sicher auf. Ohne gekoppeltes Gerät ist er der einzige Weg zurück zur
-   Besitzer-Berechtigung.
+*Du siehst jetzt*, dass das Panel von selbst zurückkommt und mit **Schritt 2 von 3 – Famalio-App
+verbinden** weitermacht. (Hast du Home Assistant schon selbst neu gestartet: **Ich habe Home Assistant
+schon neu gestartet** klicken.)
 
-## 6. Integration über HACS installieren
+### Schritt 5. Famalio-App verbinden (QR-Code scannen)
 
-Du brauchst [HACS](https://hacs.xyz). Klicke:
+Schritt 2 zeigt deine **Serveradresse**, den einmaligen **Einrichtungscode** mit **Kopieren**-Knöpfen und
+einen **QR-Code**. Der Code gilt einmal und 24 Stunden; das Add-on-Protokoll brauchst du nicht. Auf dem
+Handy (Tailscale läuft auf dem Handy):
 
-[![Repository in HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fisch192&repository=famalio-home&category=integration)
+1. Famalio-App öffnen: **Einstellungen → Famalio Home → Home-Server verbinden**.
+2. **Einrichtungscode scannen** tippen und die Kamera auf den QR-Code im Famalio-Panel halten. (Ohne
+   Scannen: Adresse eintragen, **Verbindung prüfen** tippen und den Code abtippen.)
+3. **Neue Home-Familie einrichten** aufklappen, **Dein Anzeigename** und **Familienname** eingeben und
+   **Home-Familie erstellen** tippen.
+4. Die App zeigt **einmalig** einen **Wiederherstellungscode**. Gut aufschreiben und sicher aufbewahren;
+   ohne gekoppeltes Gerät ist er der einzige Weg, die Besitzer-Rechte zurückzuholen.
 
-dann **Herunterladen** und **Home Assistant neu starten** (Einstellungen → System → Ein/Aus-Symbol → Neu starten).
+*Du siehst jetzt* in der App deine neue Home-Familie, und im Famalio-Panel wird **Schritt 2: Famalio-App
+verbinden** von selbst grün (der Code verschwindet).
 
-Ohne HACS: Ordner `custom_components/famalio` aus diesem Repository nach
-`<config>/custom_components/famalio` auf dem Home Assistant kopieren (z. B. mit dem Add-on
-*File editor* oder *Samba*) und neu starten.
+### Schritt 6. Home Assistant mit Famalio verbinden
 
-## 7. Home Assistant mit Famalio verbinden (ein Klick)
+Schritt 3 zeigt den Knopf **Mit Famalio verbinden**.
 
-1. In der Seitenleiste **Famalio** öffnen: **Einrichtung → Mit Famalio verbinden**. Es erscheint ein kurzer Code.
-2. In der Famalio-App: **Einstellungen → Famalio Home → Home-Server verbinden → Home Assistant**.
-   Unter **Verbindungsanfragen** die Anfrage mit genau diesem Code öffnen.
-3. Kalender auswählen, Detailgrad (alle Details oder nur *Beschäftigt*) und Zeitraum festlegen.
-   Optional **Home Assistant darf bearbeiten** (nur mit vollen Details): dann darf Home
-   Assistant einzelne Termine anlegen, ändern und löschen.
-4. **Verbindung erlauben** tippen und einige Sekunden warten. Das Panel bestätigt die Integration selbst und wechselt zum Kalender.
-   Die Kalender erscheinen auch unter Einstellungen → Geräte & Dienste → Famalio Home.
+1. **Mit Famalio verbinden** klicken. Ein großer Code wie `ABCD-EFGH` erscheint.
+2. In der App: **Einstellungen → Famalio Home → Home-Server verbinden → Verbindungsanfragen** und die
+   Anfrage mit genau diesem Code öffnen.
+3. Wähle, welche Kalender Home Assistant sehen darf und ob volle Details oder nur belegte Zeiten.
+   Optional: **Home Assistant darf bearbeiten** erlaubt Home Assistant, einzelne Termine anzulegen,
+   zu ändern und zu löschen (braucht volle Details).
+4. **Verbindung erlauben** tippen.
 
-Es muss kein Token kopiert werden. Klappt der Button nicht, gibt es im Panel die manuelle
-Token-Eingabe, oder du erzeugst in der App eine Integrationsfreigabe und trägst deren
-`fhi_…`-Token unter Einstellungen → Geräte & Dienste → Integration hinzufügen → Famalio Home ein.
+*Du siehst jetzt* im Panel **Verbunden ✓**, danach öffnet sich der Kalender. Deine Kalender erscheinen
+auch unter **Einstellungen → Geräte & Dienste → Famalio Home**. Wartet eine Anfrage auf Bestätigung, wird
+der Code auch oben auf der Kalenderseite gezeigt. Es muss kein Token kopiert werden; die manuelle
+Token-Variante unter **Erweitert** in Schritt 3 ist nur ein Notweg.
 
-## 8. Weitere Handys koppeln
+### Weitere Handys koppeln
 
 Auf dem Besitzer-Handy: **Einstellungen → Famalio Home → Home-Server verbinden → Gerätecode erstellen**
-(einmal verwendbar) und den Code weitergeben. Auf dem zweiten Handy (Tailscale aktiv, falls genutzt):
-denselben Bildschirm öffnen, Serveradresse eintragen, **Verbindung prüfen**, dann unter
-**Bestehender Home-Familie beitreten** Anzeigename und **Gerätecode** eingeben und **Verbindung anfragen**.
-Auf dem Besitzer-Handy die Geräteanfrage mit **Bearbeiten erlauben** bestätigen, danach auf dem zweiten
-Handy **Freigabe prüfen**.
+(einmal verwendbar) und den Code weitergeben. Auf dem zweiten Handy (Tailscale aktiv): denselben
+Bildschirm öffnen, Serveradresse eintragen, **Verbindung prüfen**, dann unter **Bestehender Home-Familie
+beitreten** Anzeigename und **Gerätecode** eingeben und **Verbindung anfragen**. Auf dem Besitzer-Handy die
+Geräteanfrage mit **Bearbeiten erlauben** bestätigen, danach auf dem zweiten Handy **Freigabe prüfen**.
 
-## 9. Alltag
+*Du siehst jetzt* auf beiden Handys denselben Kalender.
+
+### Alltag
 
 **Kalender.** Das Famalio-Panel zeigt Monats-, Wochen-, Tages- und Agenda-Ansicht. Mit
-Bearbeitungsrecht: **Neuer Termin** (oder Doppelklick auf einen Zeitslot), **Bearbeiten**,
-**Löschen**. Wiederkehrende und importierte Termine bleiben nur in der App änderbar.
+Bearbeitungsrecht: **Neuer Termin** (oder Doppelklick auf einen Zeitslot), **Bearbeiten**, **Löschen**.
+Wiederkehrende und importierte Termine bleiben nur in der App änderbar.
 
-**Automationen.** Termin wählen → **＋ Automation**. Geltungsbereich (dieser Termin, genauer Titel,
-Titel enthält Stichwort, ganzer Kalender), Zeitpunkt (Start oder Ende mit Versatz) und eine oder mehrere
-Home-Assistant-Aktionen (Szenen, Skripte, Lichter, Benachrichtigungen ...). Die Regeln laufen im
-Zeitplaner von Home Assistant und erscheinen im Automationseditor. Speichern führt die Aktion nicht sofort aus.
+**Automationen.** Termin wählen → **＋ Automation**. Geltungsbereich (dieser Termin, genauer Titel, Titel
+enthält Stichwort, ganzer Kalender), Zeitpunkt (Start oder Ende mit Versatz) und eine oder mehrere
+Home-Assistant-Aktionen (Szenen, Skripte, Lichter, Benachrichtigungen ...). Die Regeln laufen im Zeitplaner
+von Home Assistant und erscheinen im Automationseditor. Speichern führt die Aktion nicht sofort aus.
 
-**Backups.** Das Add-on nutzt Cold-Backups: Home Assistant stoppt es kurz, damit die Datenbank
-konsistent ist. *Famalio* in die Backups aufnehmen und eine Kopie außerhalb des Geräts aufbewahren.
-Ein Cold-Backup funktioniert; die **Wiederherstellung ist noch nicht geprüft** – bitte auf einer
-separaten Testinstanz probieren, nie über die laufende Installation.
+### Sicherungen und Wiederherstellung
 
-**Updates.** Auf der Add-on-Seite aktualisieren (es wird lokal neu gebaut). Datenbankänderungen laufen
-automatisch und additiv; eine neuere Datenbank wird nie zurückgestuft, ein älteres Add-on über neuen
-Daten ist kein Rollback. Die Integration in HACS aktualisieren und Home Assistant neu starten.
+Das Add-on nutzt Cold-Backups: Home Assistant stoppt es kurz, damit die Datenbank konsistent ist.
+*Famalio* in die Home-Assistant-Backups aufnehmen und eine Kopie außerhalb des Geräts aufbewahren. Ein
+Backup funktioniert; die **Wiederherstellung ist noch nicht geprüft** – auf einer separaten Testinstanz
+probieren, nie über die laufende Installation.
 
-**Deinstallieren.** In der App die Freigabe widerrufen (Bildschirm **Home Assistant**), die Integration
-entfernen (Einstellungen → Geräte & Dienste → Famalio Home → Löschen), in HACS entfernen und danach das
-Add-on deinstallieren. Beim Deinstallieren werden die Add-on-Daten samt Datenbank gelöscht. Das Gerät in
-der Tailscale-Admin-Konsole entfernen.
+### Updates
 
-## Fehlersuche
+Auf der Add-on-Seite **Aktualisieren** (es wird neu gebaut). Beim nächsten Start aktualisiert das Add-on
+auch die mitgelieferte Integration; starte Home Assistant neu, wenn das Panel fragt. Datenbankänderungen
+laufen automatisch und additiv; eine neuere Datenbank wird nie zurückgestuft, ein älteres Add-on über neuen
+Daten ist kein Rollback. Eine neuere Integration, die du selbst installiert hast (z. B. über HACS), wird nie
+überschrieben.
+
+### Deinstallieren
+
+In der App die Freigabe widerrufen (Bildschirm **Home Assistant**), die Integration entfernen
+(**Einstellungen → Geräte & Dienste → Famalio Home → Löschen**), dann das Add-on deinstallieren. Dabei
+werden die Add-on-Daten samt Datenbank gelöscht. Das Gerät in der Tailscale-Admin-Konsole entfernen. Der
+Ordner `custom_components/famalio` im Home-Assistant-Konfigurationsordner bleibt; lösche ihn, wenn du ihn
+nicht mehr willst.
+
+### Zu HACS
+
+HACS ist **optional und nicht mehr nötig**: Das Add-on installiert und aktualisiert die Integration selbst.
+Hast du sie früher über HACS installiert, verlasse dich nicht darauf: in HACS entfernen (den Integrations-
+Eintrag in Home Assistant behalten) und das Add-on die Dateien verwalten lassen. Fortgeschrittene können
+`custom_components/famalio` weiterhin über HACS installieren; das Add-on ersetzt keine Kopie mit gleicher
+oder höherer Version.
+
+### Umzug von einer älteren lokalen Add-on-Installation
+
+Hast du eine frühere Version als *lokales* Add-on (`local_famalio_home`, Version 0.2.0) getestet, wechsle so
+zur Repository-Version. **Eine frische Installation startet mit leerer Datenbank**; die Familiendaten der
+alten Installation werden nicht übernommen, was für eine Test-Installation in Ordnung ist. Beide Add-ons
+nie gleichzeitig betreiben.
+
+1. In der Famalio-App: **Einstellungen → Famalio Home → Home-Server verbinden → Trennen**.
+2. In Home Assistant den alten Integrations-Eintrag entfernen: **Einstellungen → Geräte & Dienste →
+   Famalio Home → ⋮ → Löschen**.
+3. **Einstellungen → Add-ons → Famalio (lokal) → Deinstallieren**. Den Ordner `addons/famalio_home`
+   löschen, falls du ihn für das lokale Add-on angelegt hattest.
+4. In der Tailscale-Admin-Konsole das alte Gerät `famalio-home` entfernen (damit das neue denselben Namen bekommt).
+5. Ab Schritt 1 dieser Anleitung neu installieren; in der App eine neue Home-Familie einrichten (Schritt 5)
+   und Home Assistant verbinden (Schritt 6).
+
+### Fehlersuche (Home Assistant)
 
 | Problem | Lösung |
 |---|---|
 | Add-on nicht im Store | Repository-URL prüfen, Seite neu laden oder **⋮ → Nach Updates suchen**. |
 | Build schlägt fehl | Home Assistant braucht Internet (Debian, Docker Hub, PostgreSQL-apt, npm). Add-on-**Protokoll** und Speicherplatz prüfen, erneut versuchen. |
 | Kein Seitenleisteneintrag | **In Seitenleiste anzeigen** aktivieren. Die Seite ist nur für HA-Administratoren sichtbar. |
-| Kein Setup-Code im Protokoll | Der Code erscheint nur, solange kein Besitzer existiert, und 30 Minuten lang. Add-on neu starten. Existiert schon ein Besitzer, mit einem Kopplungscode koppeln. |
-| Tailscale-Link abgelaufen / keine grüne Adresse | Assistent neu öffnen, Tailscale-Schritt wiederholen, **HTTPS-Zertifikate** im Tailnet aktivieren. |
+| Panel verlangt den Neustart, aber nichts passiert | Einmal **Home Assistant neu starten** klicken und zwei Minuten warten. Schon neu gestartet? **Ich habe Home Assistant schon neu gestartet** klicken. Im Add-on-**Protokoll** nach „Home Assistant integration installed“ suchen. |
+| Kein QR-Code / Einrichtungscode in Schritt 2 | Der Code erscheint nur, solange kein Besitzer existiert, und 24 Stunden lang. Ist er abgelaufen, das Add-on neu starten (Add-on-Seite → **Neustart**). Existiert schon ein Besitzer, mit einem Gerätecode koppeln. |
+| Tailscale-Link abgelaufen / keine grüne Adresse | Panel neu laden und **Erneut prüfen** klicken. **HTTPS Certificates** im Tailnet aktivieren. |
 | App verbindet nicht | Adresse muss `https://…` sein und vom Handy erreichbar (läuft Tailscale auf dem Handy?). Klartext-HTTP und selbstsignierte Zertifikate werden abgelehnt. |
-| „Zu viele Anfragen“ beim Koppeln | Hinter dem Proxy teilen sich alle dieselbe Quelladresse; eine Minute warten (Option `unauthenticated_rate_per_minute`). |
-| „Mit Famalio verbinden“ wartet endlos | Code rechtzeitig in der App bestätigen; Integration installiert und Home Assistant neu gestartet? Unter Einstellungen → Geräte & Dienste einen erkannten Famalio-Eintrag bestätigen. |
-| Kalender bleibt bei Einrichtung | Erkennung allein genügt nicht; das Panel wartet (Prüfung alle 15 s), bis HA eine Famalio-Kalender-Entität registriert hat. |
-| Keine Bearbeiten-Schaltflächen | In der App muss Bearbeiten erlaubt sein und die Freigabe volle Details haben (nicht *Beschäftigt*). Wiederkehrende Termine nur in der App (HTTP 409). |
+| „Mit Famalio verbinden“ wartet endlos | Code rechtzeitig in der App bestätigen; Home Assistant nach Schritt 4 neu gestartet? Unter Einstellungen → Geräte & Dienste einen erkannten Famalio-Eintrag bestätigen. |
+| Kalender bleibt bei der Einrichtung | Das Panel wartet (Prüfung alle 15 s), bis HA eine Famalio-Kalender-Entität registriert hat. |
+| Keine Bearbeiten-Schaltflächen | In der App muss Bearbeiten erlaubt sein und die Freigabe volle Details haben (nicht nur belegte Zeiten). Wiederkehrende Termine nur in der App. |
 | Integration verlangt erneute Anmeldung | Freigabe widerrufen oder abgelaufen; mit **Mit Famalio verbinden** neu erzeugen. |
+| „Zu viele Anfragen“ beim Koppeln | Eine Minute warten und erneut versuchen. |
 
-## Sicherheit und Datenschutz
+### Sicherheit und Datenschutz
 
 - Deine Kalenderdaten bleiben auf deinem Gerät; auf diesem Weg gibt es keinen Famalio-Cloud-Endpunkt.
 - PostgreSQL hat keinen Netzwerkzugang und kein Passwort (Unix-Socket, Peer-Authentifizierung).
-- Das Add-on hat keine Host-Ports, kein Host-Netzwerk, keinen Docker- oder Core-API-Zugriff, keine Hardware- oder Ordnerfreigaben; AppArmor ist aktiv.
+- Das Add-on hat keine Host-Ports, kein Host-Netzwerk, keinen Docker- oder Core-API-Zugriff und keinen
+  Hardwarezugriff; AppArmor ist aktiv.
+- **Genau eine Ordnerfreigabe, mit Absicht:** Das Add-on darf in den Konfigurationsordner von Home Assistant
+  schreiben (`map: homeassistant_config`, lesen und schreiben). Es nutzt das nur, um seine eigene Integration
+  nach `custom_components/famalio` zu kopieren, wenn sie fehlt oder älter ist, und überschreibt nie eine
+  neuere Kopie. Sonst wird in diesem Ordner nichts gelesen, aufgelistet oder verändert.
+- Der einmalige Einrichtungscode geht über eine private Datei vom Server zum Panel; er wird nur angemeldeten
+  Home-Assistant-Administratoren gezeigt und nie über die API oder das Relay gesendet.
 - Zugriff nur über HTTPS mit öffentlich vertrauenswürdigem Zertifikat; Tailscale Funnel wird nicht genutzt.
-- Home Assistant erhält nur die vom Besitzer bestätigte Freigabe (Kalender, Detailgrad, Zeitraum, optional Bearbeiten), jederzeit in der App widerrufbar.
-- Die Anmeldung als HA-Administrator gibt keine Famalio-Rolle; jede API-Anfrage braucht eine gekoppelte Geräte-Sitzung.
+- Home Assistant erhält nur die vom Besitzer bestätigte Freigabe, jederzeit in der App widerrufbar.
 - Basis-Images sind per Tag statt Digest referenziert; SBOM und Signierung fehlen noch.
+
+## Häufige Fragen
+
+**Was kostet das?** Die Server-Software ist kostenlos. Du brauchst die Famalio-App und den Kauf **Famalio
+Home** in der App. Der kostenlose Tailscale-Tarif genügt für eine Familie; Domain (nur für `domain`) und
+Hardware sind deine eigenen Kosten.
+
+**Funktioniert es offline?** Die Handys halten den Kalender auf dem Gerät und synchronisieren, sobald sie den
+Server wieder erreichen. Unterwegs brauchen sie die HTTPS-Verbindung (z. B. Tailscale auf dem Handy).
+
+**Was, wenn die Famalio-Cloud verschwindet?** Dein Home-Server nutzt sie nicht. Die Daten liegen in deiner
+eigenen Datenbank und in den Apps auf den Handys. Sichere den Server regelmäßig; die Famalio-App muss auf den
+Handys installiert bleiben.
+
+**Wo sind meine Daten?** Nur auf deinem Gerät (Datenbank im Add-on bzw. im Docker-Volume), nicht bei Famalio.
 
 ## Ohne Home Assistant: Linux-Server mit einem Befehl
 
@@ -198,10 +265,18 @@ und fragt:
 2. Je nach Wahl den **Tailscale-Auth-Key** oder **Domain und E-Mail-Adresse**.
 3. Ob eine **tägliche Sicherung** eingerichtet werden soll (empfohlen).
 
-Am Ende zeigt er die **Serveradresse** und den einmaligen **Setup-Code** (30 Minuten gültig).
-Weiter mit Schritt 5 oben ab Punkt 2 (App: **Einstellungen → Famalio Home → Home-Server verbinden**,
-Adresse eintragen, **Verbindung prüfen**, **Neue Home-Familie einrichten**, **Home-Familie erstellen**,
-Wiederherstellungscode aufschreiben) und für weitere Handys mit Schritt 8.
+Am Ende zeigt er die **Serveradresse** und den einmaligen **Server-Einrichtungscode** (30 Minuten
+gültig). Ist das Programm `qrencode` auf dem Server installiert (`sudo apt install qrencode`), erscheint
+zusätzlich ein **QR-Code** im Terminal. Dann in der App:
+
+1. **Einstellungen → Famalio Home → Home-Server verbinden**.
+2. **Einrichtungscode scannen** tippen und die Kamera auf den QR-Code halten (Adresse und Code werden
+   eingetragen). Ohne QR-Code: Adresse eintragen und **Verbindung prüfen** tippen.
+3. **Neue Home-Familie einrichten** aufklappen, Anzeigename und Familienname eingeben (und, falls nicht
+   gescannt, den Server-Einrichtungscode), dann **Home-Familie erstellen**.
+4. Den **Wiederherstellungscode** aufschreiben: Er wird nur einmal angezeigt.
+
+Weitere Handys koppelst du wie [oben beschrieben](#weitere-handys-koppeln).
 
 Skript lieber vorher lesen: `curl -fsSLO https://raw.githubusercontent.com/fisch192/famalio-home/main/install.sh`,
 `less install.sh`, dann `sudo bash install.sh`.
