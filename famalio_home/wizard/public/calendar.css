@@ -191,3 +191,9 @@ textarea.fx-input { resize: vertical; font-family: ui-monospace, SFMono-Regular,
   .fx-agenda-date { flex-direction: row; gap: 8px; align-items: baseline; }
   .fx-title { font-size: 18px; margin: 0; }
 }
+
+.fx-muted { opacity: .75; }
+.fx-notice { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line)); font-size: 13px; }
+.fx-notice span { color: var(--muted); }
+.fx-steps { margin: 4px 0 8px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
+.fx-notice-card { display: flex; flex-direction: column; gap: 10px; }

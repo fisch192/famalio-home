@@ -113,7 +113,7 @@ class FamalioCalendar {
     const app = node("div", "fx-app");
     const side = node("aside", "fx-side");
     this.newButton = button("＋ Neuer Termin", "fx-btn fx-primary fx-new");
-    this.newButton.addEventListener("click", () => this.openEditor(null, this.anchor));
+    this.newButton.addEventListener("click", () => (this.writableCalendars().length ? this.openEditor(null, this.anchor) : this.openEditNotice()));
     this.mini = node("section", "fx-mini");
     const calSection = node("section", "fx-side-section");
     calSection.append(node("h3", "fx-side-title", "Kalender"));
@@ -307,7 +307,9 @@ class FamalioCalendar {
   paint() {
     this.title.textContent = this.headline();
     for (const b of this.viewButtons) { const active = b.dataset.view === this.view; b.classList.toggle("active", active); b.setAttribute("aria-selected", String(active)); }
-    this.newButton.hidden = !this.writableCalendars().length;
+    this.newButton.hidden = !this.calendars.length;
+    this.newButton.classList.toggle("fx-muted", !this.writableCalendars().length);
+    this.newButton.title = this.writableCalendars().length ? "" : "Bearbeiten ist nicht aktiviert";
     this.status.replaceChildren();
     if (this.loading) this.status.append(node("span", "fx-loading", "Termine werden geladen …"));
     else if (this.error) {
@@ -530,7 +532,12 @@ class FamalioCalendar {
     }
     if (actions.childElementCount) this.drawer.append(actions);
     if (recurring) this.drawer.append(node("p", "fx-hint", "Wiederkehrende Termine bearbeiten Sie in der Famalio App."));
-    else if (!this.writable(event.entity_id, FEATURE.UPDATE)) this.drawer.append(node("p", "fx-hint", "Nur lesbar. Erlauben Sie Home Assistant das Bearbeiten in der Famalio App unter Einstellungen → Home Assistant."));
+    else if (!this.writable(event.entity_id, FEATURE.UPDATE)) {
+      const more = button("So aktivierst du das Bearbeiten", "fx-link"); more.addEventListener("click", () => this.openEditNotice(event));
+      const box = node("div", "fx-notice"); box.append(node("strong", "", "Bearbeiten ist nicht aktiviert"),
+        node("span", "", "Home Assistant darf Termine hier nur ansehen. Automationen kannst du trotzdem anlegen."), more);
+      this.drawer.append(box);
+    }
 
     const rulesBox = node("section", "fx-card");
     const head = node("div", "fx-section-head"); head.append(node("h3", "", "Automationen"));
@@ -548,11 +555,33 @@ class FamalioCalendar {
     add.focus();
   }
 
+  /** Explains, in plain words, why editing is off and exactly how to turn it on in the Famalio app. */
+  openEditNotice(event = null) {
+    this.showDrawer("Bearbeiten aktivieren");
+    const card = node("section", "fx-card fx-notice-card");
+    card.append(node("h2", "fx-drawer-title", "Bearbeiten ist nicht aktiviert"),
+      node("p", "fx-description", "Home Assistant darf deine Termine im Moment nur lesen. Du kannst hier trotzdem Automationen zu Terminen anlegen. Um Termine auch hier anzulegen, zu ändern oder zu löschen, musst du das in der Famalio-App erlauben:"));
+    const steps = document.createElement("ol"); steps.className = "fx-steps";
+    for (const text of [
+      "Öffne die Famalio-App auf deinem Handy.",
+      "Tippe auf Einstellungen → Famalio Home → Home-Server verbinden → Home Assistant.",
+      "Unter „Verbunden“ die bestehende Verbindung löschen (nach links wischen → Widerrufen).",
+      "Hier im Panel auf „Einrichtung → Mit Famalio verbinden“ tippen und den neuen Code in der App bestätigen.",
+      "Dort den Schalter „Home Assistant darf bearbeiten“ einschalten und „Verbindung erlauben“ tippen.",
+    ]) steps.append(node("li", "", text));
+    card.append(steps, node("p", "fx-hint", "Wiederkehrende und importierte Termine bleiben immer nur in der Famalio-App bearbeitbar."));
+    const setup = button("Zur Einrichtung", "fx-btn fx-primary"); setup.dataset.openSettings = "";
+    setup.addEventListener("click", () => this.closeDrawer());
+    card.append(setup);
+    this.drawer.append(card);
+    if (event) { const back = button("Zurück zum Termin", "fx-link"); back.addEventListener("click", () => this.openEvent(event)); this.drawer.append(back); }
+  }
+
   openEditor(event, dayKey = this.anchor, time = "09:00") {
     const editing = !!event;
     this.showDrawer(editing ? "Termin bearbeiten" : "Neuer Termin");
     const writable = editing ? this.calendars.filter((c) => c.id === event.entity_id) : this.writableCalendars();
-    if (!writable.length) { this.drawer.append(node("p", "fx-hint", "Kein Kalender erlaubt das Bearbeiten.")); return; }
+    if (!writable.length) { this.openEditNotice(event); return; }
     const form = document.createElement("form"); form.className = "fx-form";
     const startKey = editing ? localDayKey(event.start, this.zone) : dayKey;
     const endKey = editing ? (event.all_day ? addDays(localDayKey(event.end, this.zone), -1) : localDayKey(event.end, this.zone)) : dayKey;
