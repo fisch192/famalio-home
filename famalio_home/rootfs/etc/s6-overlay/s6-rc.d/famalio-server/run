@@ -1,0 +1,35 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+# Longrun: Famalio API as the unix account famalio_app (DB role famalio_app:
+# DML only). Tailnet mode is loopback-only. Existing-proxy mode binds only to
+# this container's internal bridge; Supervisor publishes no host port.
+# On first start without an owner the server prints the one-time owner setup
+# code to stdout, i.e. only to the add-on log (ADR-002 §2).
+set -euo pipefail
+# shellcheck source=SCRIPTDIR/../../scripts/famalio-env.sh
+. "${FAMALIO_ENV_SH:-/etc/s6-overlay/scripts/famalio-env.sh}"
+cd "$FAMALIO_APP_DIR"
+
+# Integer option from the Supervisor-written options.json (no Supervisor API).
+opt() { # <key> <default>
+  node -e '
+    const [file, key, fallback] = process.argv.slice(1);
+    let v; try { v = JSON.parse(require("fs").readFileSync(file, "utf8"))[key]; } catch {}
+    process.stdout.write(String(Number.isInteger(v) && v > 0 ? v : fallback));
+  ' "$FAMALIO_OPTIONS_FILE" "$1" "$2"
+}
+rate="$(opt unauthenticated_rate_per_minute 20)"
+body_mb="$(opt max_body_megabytes 8)"
+
+FAMALIO_DATABASE_URL="$(pg_socket_url famalio_app)"
+export FAMALIO_DATABASE_URL
+case "$(remote_access_mode)" in
+  reverse_proxy) default_host=0.0.0.0 ;;
+  *) default_host=127.0.0.1 ;;
+esac
+export FAMALIO_HOST="${FAMALIO_HOST:-$default_host}"
+export FAMALIO_PORT="${FAMALIO_PORT:-8787}"
+export FAMALIO_UNAUTHENTICATED_RATE_PER_MINUTE="$rate"
+export FAMALIO_MAX_BODY_BYTES="$((body_mb * 1024 * 1024))"
+unset FAMALIO_OWNER_DATABASE_URL
+exec "$FAMALIO_SETUIDGID" famalio_app node src/main.ts

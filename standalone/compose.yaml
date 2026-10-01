@@ -1,0 +1,212 @@
+# Famalio Home – standalone Docker (NAS / Linux host). P06, not released.
+#
+# This file is ONLY for standalone Docker. It is not meant to be used from a
+# Home Assistant add-on and never needs the host Docker socket (05_HA_NETWORK).
+#
+#   ./make-secrets.sh                                  # once
+#   docker compose -f compose.yaml up -d               # postgres + migrate + server
+#   docker compose -f compose.yaml --profile tailscale up -d   # + private remote access
+#   docker compose -f compose.yaml --profile domain up -d      # + Caddy, HTTPS via Let's Encrypt
+#
+# The one-line installer (../install.sh) writes a .env next to this file with
+# COMPOSE_PROFILES, FAMALIO_DOMAIN, FAMALIO_ACME_EMAIL and FAMALIO_SECRETS_DIR.
+#
+# Defaults: API published on 127.0.0.1:8787 only; PostgreSQL not published at
+# all; every container read-only, all capabilities dropped, no-new-privileges.
+# Base images must be pinned by digest for a release (see ../README.md, TODO).
+
+name: famalio-home
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: false
+  logging:
+    driver: local
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+# Both Famalio services build the same local image. It is never pulled from a
+# registry by name (a local tag such as famalio-home-server:dev must not be
+# resolved against Docker Hub).
+x-famalio-image: &famalio-image
+  image: ${FAMALIO_IMAGE:-famalio-home-server:dev}
+  pull_policy: build
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+x-server-env: &server-env
+  FAMALIO_DB_HOST: postgres
+  FAMALIO_DB_PORT: "5432"
+  FAMALIO_DB_NAME: famalio
+
+services:
+  postgres:
+    <<: *hardening
+    # TODO(P06/G8): pin postgres:16-bookworm@sha256:<digest> for a release.
+    image: postgres:16-bookworm
+    # Run as the image's postgres account (uid/gid 999 in the Debian image)
+    # from the start, so the entrypoint needs no chown/setuid capabilities.
+    user: "999:999"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=peer"
+      FAMALIO_OWNER_PASSWORD_FILE: /run/secrets/famalio_owner_password
+      FAMALIO_APP_PASSWORD_FILE: /run/secrets/famalio_app_password
+    secrets:
+      - postgres_superuser_password
+      - famalio_owner_password
+      - famalio_app_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init/10-famalio-roles.sh:/docker-entrypoint-initdb.d/10-famalio-roles.sh:ro
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    networks: [db]
+    # No `ports:` – the database is reachable only on the internal `db` network.
+    healthcheck:
+      # TCP probe: during first-time init the temporary server listens on the
+      # unix socket only, so this turns healthy only once init has finished.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  famalio-migrate:
+    <<: [*hardening, *famalio-image]
+    command: ["migrate"]
+    environment:
+      <<: *server-env
+      FAMALIO_OWNER_DB_USER: famalio_owner
+      FAMALIO_OWNER_DB_PASSWORD_FILE: /run/secrets/famalio_owner_password
+      FAMALIO_APP_ROLE: famalio_app
+    secrets:
+      - famalio_owner_password
+    tmpfs:
+      - /tmp
+    networks: [db]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # One-shot. A failed migration stops here; the server does not start and
+    # nothing retries the migration in a loop (OPS-04).
+    restart: "no"
+    healthcheck:
+      disable: true
+
+  famalio-server:
+    <<: [*hardening, *famalio-image]
+    command: ["serve"]
+    environment:
+      <<: *server-env
+      FAMALIO_APP_DB_USER: famalio_app
+      FAMALIO_APP_DB_PASSWORD_FILE: /run/secrets/famalio_app_password
+      # Inside the container the API listens on all container interfaces; what
+      # is reachable from the host is decided by `ports:` below.
+      FAMALIO_HOST: 0.0.0.0
+      FAMALIO_PORT: "8787"
+    secrets:
+      - famalio_app_password
+    tmpfs:
+      - /tmp
+    networks: [db, edge]
+    ports:
+      # Loopback by default. Binding to a LAN address is an explicit operator
+      # choice (FAMALIO_PUBLISH_ADDRESS); never publish on a router/port-forward.
+      - "${FAMALIO_PUBLISH_ADDRESS:-127.0.0.1}:${FAMALIO_PUBLISH_PORT:-8787}:8787"
+    depends_on:
+      famalio-migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  # Optional private remote access (profile "tailscale"). Serve only, Funnel
+  # off, no subnet routes, no exit node, userspace networking (no NET_ADMIN,
+  # no /dev/net/tun). Untested in this environment – see ../README.md.
+  tailscale:
+    <<: *hardening
+    profiles: [tailscale]
+    # TODO(P06/G8): pin tailscale/tailscale:<version>@sha256:<digest>.
+    image: tailscale/tailscale:stable
+    hostname: ${FAMALIO_TS_HOSTNAME:-famalio-home}
+    environment:
+      TS_AUTHKEY: file:/run/secrets/ts_authkey
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_ACCEPT_DNS: "false"
+      TS_SERVE_CONFIG: /config/serve.json
+      # Only tag the node; never add --advertise-routes / --advertise-exit-node.
+      TS_EXTRA_ARGS: ${FAMALIO_TS_EXTRA_ARGS:-}
+    secrets:
+      - ts_authkey
+    volumes:
+      - tsstate:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    tmpfs:
+      - /tmp
+      - /var/run/tailscale
+    networks: [edge]
+    depends_on:
+      famalio-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional public HTTPS with an own domain (profile "domain"). Caddy gets a
+  # Let's Encrypt certificate for FAMALIO_DOMAIN automatically and proxies to
+  # the API. Needs a DNS A/AAAA record pointing to this host and TCP ports 80
+  # and 443 reachable from the internet (HTTP-01/TLS-ALPN-01 challenge).
+  caddy:
+    <<: *hardening
+    profiles: [domain]
+    image: caddy:2
+    # Binding :80/:443 inside the container is the only extra capability.
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      FAMALIO_DOMAIN: ${FAMALIO_DOMAIN:-}
+      FAMALIO_ACME_EMAIL: ${FAMALIO_ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp
+    networks: [edge]
+    depends_on:
+      famalio-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  # Database traffic only; no route to the outside world.
+  db:
+    internal: true
+  # API publishing and (optional) Tailscale egress.
+  edge: {}
+
+volumes:
+  pgdata: {}
+  tsstate: {}
+  caddy_data: {}
+  caddy_config: {}
+
+secrets:
+  postgres_superuser_password:
+    file: ${FAMALIO_SECRETS_DIR:-./secrets}/postgres_superuser_password
+  famalio_owner_password:
+    file: ${FAMALIO_SECRETS_DIR:-./secrets}/famalio_owner_password
+  famalio_app_password:
+    file: ${FAMALIO_SECRETS_DIR:-./secrets}/famalio_app_password
+  ts_authkey:
+    file: ${FAMALIO_SECRETS_DIR:-./secrets}/ts_authkey

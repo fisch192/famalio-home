@@ -1,0 +1,22 @@
+{
+  "name": "famalio-home-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Famalio Home: self-hosted family calendar API (P02, not released).",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "migrate": "node src/migrate.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "sh scripts/test.sh"
+  },
+  "dependencies": {
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/pg": "8.23.1",
+    "typescript": "5.9.3"
+  }
+}

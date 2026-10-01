@@ -1,0 +1,128 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+# Tailscale lifecycle controller. It keeps node state under /data/tailscale,
+# publishes only the API through Serve, and writes a small sanitized status file
+# for the ingress wizard. No raw CLI output or credentials are persisted/logged.
+set -euo pipefail
+. "${FAMALIO_ENV_SH:-/etc/s6-overlay/scripts/famalio-env.sh}"
+if [ "$(remote_access_mode)" != tailscale ]; then
+  exec "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" sleep infinity
+fi
+ts() { "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" "$TAILSCALE_BIN" --socket="$TS_SOCKET" "$@"; }
+bounded_ts() { "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" timeout --signal=TERM --kill-after=2s 10s "$TAILSCALE_BIN" --socket="$TS_SOCKET" "$@"; }
+
+serve_is_safe() {
+  local raw
+  raw="$(ts serve status --json 2>/dev/null || true)"
+  printf '%s' "$raw" | node -e '
+    let text = "";
+    process.stdin.on("data", x => text += x).on("end", () => {
+      try {
+        const root = JSON.parse(text);
+        const hasMap = (value, path = "") => {
+          if (!value || typeof value !== "object") return false;
+          if (path.includes(":443") && value.Handlers && Object.values(value.Handlers).some(h => h?.Proxy === "http://127.0.0.1:8787")) return true;
+          return Object.entries(value).some(([k, v]) => hasMap(v, `${path}/${k}`));
+        };
+        const collect = (value, out = []) => {
+          if (!value || typeof value !== "object") return out;
+          for (const [k, v] of Object.entries(value)) { if (k === "AllowFunnel") out.push(v); collect(v, out); }
+          return out;
+        };
+        const funnels = collect(root);
+        // Go encoding/json uses omitempty for ServeConfig.AllowFunnel, so an
+        // absent field means no Funnel listener is configured. Reject any
+        // explicit true value while still requiring our exact Serve mapping.
+        if (!hasMap(root) || funnels.some(x => !x || typeof x !== "object" || Object.values(x).some(Boolean))) process.exit(1);
+      } catch { process.exit(1); }
+    });
+  '
+}
+
+for _ in $(seq 1 60); do [ -S "$TS_SOCKET" ] && break; sleep 1; done
+[ -S "$TS_SOCKET" ] || { echo "[famalio] tailscaled socket missing after 60 s" >&2; exit 1; }
+
+hostname="$(opt_str tailscale_hostname)"
+[[ "$hostname" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || hostname=famalio-home
+up_args=(up --reset --hostname="$hostname" --accept-dns=false --accept-routes=false
+         --advertise-exit-node=false --ssh=false)
+
+write_status() { # <serve-state> <https-ready>
+  local serve_state="$1" https_ready="$2" raw
+  raw="$(ts status --json 2>/dev/null || true)"
+  printf '%s' "$raw" | "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" node -e '
+    let text = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", x => text += x);
+    process.stdin.on("end", () => {
+      const fs = require("fs"), path = process.argv[1];
+      const serveState = process.argv[2], httpsReady = process.argv[3] === "true";
+      let s = {};
+      try { s = JSON.parse(text); } catch {}
+      const backend = typeof s.BackendState === "string" ? s.BackendState : "Unknown";
+      const auth = typeof s.AuthURL === "string" && /^https:\/\/login\.tailscale\.com\//.test(s.AuthURL) ? s.AuthURL : null;
+      let dns = typeof s.Self?.DNSName === "string" ? s.Self.DNSName.replace(/\.$/, "").toLowerCase() : null;
+      if (dns && !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(dns)) dns = null;
+      const value = {version: 1, backend_state: backend, auth_url: auth, self_dns_name: dns,
+        https_url: dns ? `https://${dns}` : null,
+        https_enable_url: serveState === "waiting_for_https" ? "https://login.tailscale.com/admin/dns" : null,
+        https_ready: httpsReady, serve_state: serveState,
+        updated_at: new Date().toISOString()};
+      const tmp = `${path}.tmp`;
+      try { fs.writeFileSync(tmp, JSON.stringify(value) + "\n", {mode: 0o600}); fs.renameSync(tmp, path); }
+      catch { try { fs.unlinkSync(tmp); } catch {} process.exitCode = 1; }
+    });
+  ' "$FAMALIO_SETUP_DIR/tailscale-status.json" "$serve_state" "$https_ready"
+}
+
+# Reuse a logged-in node exactly as it is; in particular don't reapply a stale
+# one-time auth key from legacy options during ordinary restarts.
+initial="$(ts status --json 2>/dev/null || true)"
+backend="$(printf '%s' "$initial" | node -e 'let s="";process.stdin.on("data",x=>s+=x).on("end",()=>{try{const x=JSON.parse(s);process.stdout.write(x.BackendState||"")}catch{}})')"
+if [ "$backend" != Running ]; then
+  key_file="$TS_RUN_DIR/authkey"
+  key="$(opt_str tailscale_auth_key)"
+  if [ -n "$key" ]; then
+    (umask 077 && printf '%s' "$key" >"$key_file")
+    chown "$FAMALIO_TS_USER" "$key_file"
+    up_args+=(--auth-key="file:$key_file")
+  fi
+  unset key
+  # `up` emits no raw output into the add-on log; its AuthURL is read back from
+  # status JSON and shown only in the authenticated setup wizard.
+  bounded_ts "${up_args[@]}" >/dev/null 2>&1 || true
+  rm -f "$key_file"
+fi
+
+# The app-owned tailnet node has no prior user-managed Serve/Funnel settings.
+# Reset once per controller start (this is this app's dedicated node), then
+# recheck the actual Serve JSON on every cycle so reconnects and drift recover.
+bounded_ts serve reset >/dev/null 2>&1 || true
+while :; do
+  state="$(ts status --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",x=>s+=x).on("end",()=>{try{const x=JSON.parse(s);process.stdout.write(x.BackendState||"Unknown")}catch{process.stdout.write("Unknown")}})' 2>/dev/null || echo Unknown)"
+  if [ "$state" = Running ]; then
+    tmp="$TS_RUN_DIR/serve-output"
+    if ! serve_is_safe; then
+      if bounded_ts serve --bg --https=443 "http://127.0.0.1:${FAMALIO_PORT:-8787}" >"$tmp" 2>&1; then :; fi
+    fi
+    if serve_is_safe; then
+      serve_state=active
+      https_ready=true
+    else
+      output="$(cat "$tmp" 2>/dev/null || true)"
+      if printf '%s' "$output" | grep -Eqi 'https|certificate|DNS|MagicDNS'; then
+        serve_state=waiting_for_https
+      else
+        serve_state=error
+      fi
+      https_ready=false
+    fi
+    rm -f "$tmp"
+  elif [ "$state" != Running ]; then
+    bounded_ts serve reset >/dev/null 2>&1 || true
+    serve_state=waiting_for_login
+    https_ready=false
+  fi
+  write_status "${serve_state:-waiting_for_login}" "${https_ready:-false}" || true
+  sleep 10
+done

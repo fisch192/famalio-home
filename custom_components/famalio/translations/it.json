@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connetti a Famalio Home",
+        "description": "Usa un indirizzo HTTPS e un token di integrazione creato da un proprietario della famiglia Famalio.",
+        "data": {
+          "url": "Indirizzo HTTPS del server",
+          "api_key": "Token di integrazione"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Rinnova l'accesso a Famalio Home",
+        "description": "Crea un nuovo token di integrazione in Famalio e inseriscilo qui.",
+        "data": {
+          "url": "Indirizzo HTTPS del server",
+          "api_key": "Nuovo token di integrazione"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Collega il calendario Famalio",
+        "description": "La procedura guidata ha preparato l’accesso a {url}. Conferma per aggiungere il calendario. Una connessione esistente alla stessa famiglia verrà aggiornata."
+      }
+    },
+    "error": {
+      "invalid_url": "Inserisci un'origine HTTPS senza percorso.",
+      "invalid_auth": "Il token di integrazione non è valido o è stato revocato.",
+      "server_changed": "Questo token appartiene a un'altra famiglia Famalio o a un altro server. Rimuovi questa voce e aggiungi l'altro server separatamente.",
+      "cannot_connect": "Connessione non riuscita o risposta non valida del server."
+    },
+    "abort": {
+      "already_configured": "Questa integrazione Famalio è già configurata.",
+      "reauth_successful": "L'accesso a Famalio Home è stato rinnovato.",
+      "invalid_discovery": "La procedura guidata ha fornito dati di connessione non validi.",
+      "already_in_progress": "È già in corso la configurazione di una connessione a questa famiglia."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Intervallo di aggiornamento del calendario",
+        "description": "Frequenza con cui Home Assistant controlla Famalio Home per verificare le modifiche al calendario. Scegli da 30 a 3600 secondi.",
+        "data": {
+          "scan_interval": "Intervallo di controllo (secondi)"
+        }
+      }
+    }
+  }
+}

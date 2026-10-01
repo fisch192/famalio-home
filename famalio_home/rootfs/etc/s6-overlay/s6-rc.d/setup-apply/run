@@ -1,0 +1,42 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+# Narrow root controller: observe only validated wizard generations and restart
+# the three services whose bind/network mode is affected. It never evaluates
+# config values as shell, changes database files, or accepts service paths.
+set -euo pipefail
+. "${FAMALIO_ENV_SH:-/etc/s6-overlay/scripts/famalio-env.sh}"
+
+applied="${FAMALIO_SETUP_APPLIED:-/run/famalio-setup-applied}"
+read_valid_config() {
+  node -e '
+    const fs = require("fs");
+    const { URL } = require("url");
+    try {
+      const c = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      if (!c || c.version !== 1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.generation)) process.exit(1);
+      if (c.mode !== "tailscale" && c.mode !== "reverse_proxy") process.exit(1);
+      if (c.mode === "reverse_proxy") {
+        const u = new URL(c.https_url);
+        if (u.protocol !== "https:" || !u.hostname || u.username || u.password || u.search || u.hash) process.exit(1);
+      }
+      process.stdout.write(c.generation);
+    } catch { process.exit(1); }
+  ' "$FAMALIO_SETUP_CONFIG" 2>/dev/null
+}
+
+while :; do
+  if generation="$(read_valid_config 2>/dev/null)" && [ -n "$generation" ]; then
+    previous=""
+    [ ! -r "$applied" ] || previous="$(cat "$applied" 2>/dev/null || true)"
+    if [ "$generation" != "$previous" ]; then
+      echo "[famalio] applying setup generation (service restart)"
+      s6-svc -r /run/service/famalio-server
+      s6-svc -r /run/service/tailscaled
+      s6-svc -r /run/service/tailscale-serve
+      printf '%s\n' "$generation" >"$applied.tmp"
+      chmod 0600 "$applied.tmp"
+      mv -f "$applied.tmp" "$applied"
+    fi
+  fi
+  sleep 2
+done

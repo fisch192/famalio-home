@@ -1,0 +1,55 @@
+# Famalio Home – Home Assistant OS app/add-on (P06, experimental, not released).
+# Format: https://developers.home-assistant.io/docs/add-ons/configuration
+# Least privilege (SEC-07/SEC-09, ADR-002 §3): ingress is reserved for the
+# authenticated, source-filtered setup wizard. Discovery hands the scoped
+# read-only grant to Famalio Core. No Core/Docker API, host network/ports,
+# extra capabilities, or host mappings.
+name: Famalio
+version: "0.3.0"
+slug: famalio_home
+url: https://github.com/fisch192/famalio-home
+description: Self-hosted Famalio family calendar server (PostgreSQL + API)
+stage: experimental
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+# s6-overlay from the base image is PID 1; Docker's tini must not run as well.
+init: false
+# Supervisor stops the app before a backup so the PostgreSQL files under /data
+# are consistent (OPS-02). No live copy of a running cluster.
+backup: cold
+# Seconds to wait on stop: PostgreSQL gets a fast shutdown (SIGINT) first.
+timeout: 60
+# No host port at all. Ingress is only the administrator setup wizard; the
+# family API is tailnet-only or reachable to an explicitly managed HTTPS proxy
+# on the HA apps network. Tailscale mode also has a read-only TLS relay for HA.
+ingress: true
+ingress_port: 8099
+ingress_panel: true
+# HA already appends the ingress root slash; a second slash breaks routing.
+ingress_entry: ""
+panel_admin: true
+panel_title: Famalio
+panel_icon: mdi:calendar-heart
+discovery:
+  - famalio
+host_network: false
+hassio_api: false
+homeassistant_api: false
+auth_api: false
+docker_api: false
+full_access: false
+apparmor: true
+map: []
+options:
+  unauthenticated_rate_per_minute: 20
+  max_body_megabytes: 8
+  tailscale_hostname: famalio-home
+schema:
+  unauthenticated_rate_per_minute: int(1,600)
+  max_body_megabytes: int(1,32)
+  tailscale_hostname: match(^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$)
+  # Compatibility for stored 0.1.x options; new installs choose in the wizard.
+  remote_access: "list(tailscale|disabled)?"

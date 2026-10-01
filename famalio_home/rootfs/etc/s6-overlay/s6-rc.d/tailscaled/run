@@ -1,0 +1,18 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+# Longrun: Tailscale daemon for THIS add-on only, as unix account famalio_ts.
+# Userspace networking: no NET_ADMIN, no /dev/net/tun, no host network. It is a
+# separate tailnet node (default name famalio-home) and does not touch the
+# Home Assistant Tailscale app. No log upload to Tailscale (SEC-08).
+set -euo pipefail
+# shellcheck source=SCRIPTDIR/../../scripts/famalio-env.sh
+. "${FAMALIO_ENV_SH:-/etc/s6-overlay/scripts/famalio-env.sh}"
+if [ "$(remote_access_mode)" != tailscale ]; then
+  echo "[famalio] remote access disabled in the app options; Tailscale not started"
+  exec "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" sleep infinity
+fi
+exec "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" "$TAILSCALED_BIN" \
+  --tun=userspace-networking \
+  --statedir="$TS_STATE_DIR" \
+  --socket="$TS_SOCKET" \
+  --no-logs-no-support

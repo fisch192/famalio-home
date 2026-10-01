@@ -1,0 +1,20 @@
+configuration:
+  unauthenticated_rate_per_minute:
+    name: Limit für nicht angemeldete Anfragen
+    description: >-
+      Maximale Anfragen pro Minute und Quelladresse für Routen, die nur einen
+      Einrichtungs- oder Kopplungscode akzeptieren (ohne Sitzung). Niedriger
+      ist sicherer.
+  max_body_megabytes:
+    name: Maximale Anfragegröße (MB)
+    description: >-
+      Größter Anfrageinhalt, den die API annimmt, in Megabyte.
+  tailscale_hostname:
+    name: Tailscale-Gerätename
+    description: >-
+      Name, den der Assistent beim Hinzufügen dieser App zum Tailnet verwendet.
+  remote_access:
+    name: Alter Fernzugriff (nur bestehende Installationen)
+    description: >-
+      Kompatibilität für Aktualisierungen von Version 0.1.x. Neue Installationen
+      wählen Tailscale oder einen vorhandenen HTTPS-Proxy im Einrichtungsassistenten.

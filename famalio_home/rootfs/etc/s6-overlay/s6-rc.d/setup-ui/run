@@ -1,0 +1,9 @@
+#!/command/with-contenv bash
+# Authenticated HA Ingress wizard and internal read-only TLS relay. Runs as
+# famalio_ts so it can read Tailscale status/socket and atomically write its
+# private setup state and certs. No DB access or host port is granted.
+set -euo pipefail
+. "${FAMALIO_ENV_SH:-/etc/s6-overlay/scripts/famalio-env.sh}"
+export FAMALIO_SETUP_DIR FAMALIO_WIZARD_PORT=8099
+export TS_SOCKET TAILSCALE_BIN
+exec "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" /usr/local/bin/node /opt/famalio-wizard/server.mjs

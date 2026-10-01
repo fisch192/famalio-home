@@ -1,0 +1,19 @@
+configuration:
+  unauthenticated_rate_per_minute:
+    name: Unauthenticated request limit
+    description: >-
+      Maximum requests per minute and source address for routes that accept only a
+      setup or pairing secret (no session). Lower is safer.
+  max_body_megabytes:
+    name: Maximum request size (MB)
+    description: >-
+      Largest request body the API accepts, in megabytes.
+  tailscale_hostname:
+    name: Tailscale device name
+    description: >-
+      Name used by the guided setup when adding this app to your tailnet.
+  remote_access:
+    name: Legacy remote access (existing installs only)
+    description: >-
+      Compatibility for installations upgraded from 0.1.x. New installations
+      choose Tailscale or an existing HTTPS proxy in the guided setup instead.

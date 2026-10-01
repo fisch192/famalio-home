@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate YAML and JSON
+        run: |
+          pip install pyyaml
+          python - <<'PY'
+          import json, yaml
+          for f in ("repository.yaml", "famalio_home/config.yaml",
+                    "famalio_home/translations/en.yaml",
+                    "famalio_home/translations/de.yaml",
+                    "famalio_home/translations/it.yaml"):
+              yaml.safe_load(open(f)); print("ok", f)
+          for f in ("hacs.json", "custom_components/famalio/manifest.json",
+                    "custom_components/famalio/strings.json",
+                    "custom_components/famalio/translations/de.json",
+                    "custom_components/famalio/translations/it.json"):
+              json.load(open(f)); print("ok", f)
+          cfg = yaml.safe_load(open("famalio_home/config.yaml"))
+          assert cfg["slug"] == "famalio_home" and cfg["version"]
+          PY
+      - name: Compile integration
+        run: python -m compileall -q custom_components/famalio
+      - name: Integration unit tests (standard library only)
+        working-directory: custom_components/famalio
+        run: python -m unittest tests.test_events -v
+
+  wizard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test tests/wizard/*.test.mjs
+
+  addon-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build add-on image (linux/amd64, not pushed)
+        run: |
+          docker build \
+            --build-arg BUILD_ARCH=amd64 \
+            --tag famalio-home-addon:ci \
+            famalio_home
+
+  standalone-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build standalone image (not pushed)
+        run: docker build --tag famalio-home-server:ci standalone
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck installer and helper scripts
+        run: shellcheck --shell=sh install.sh standalone/make-secrets.sh
+
+  installer-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DIR: /opt/famalio-home
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install (local mode, from this checkout)
+        run: |
+          sudo ./install.sh --non-interactive --mode local --dir "$DIR" --source "$GITHUB_WORKSPACE" | tee install.log
+      - name: Health, setup code, secret handling
+        run: |
+          set -eu
+          curl -fsS http://127.0.0.1:8787/health/live
+          echo
+          grep -Eq 'Owner setup code: +fhs_[A-Za-z0-9_-]{16,}' install.log || { echo "no setup code printed"; exit 1; }
+          test "$(sudo stat -c %a "$DIR/secrets")" = 700
+          test "$(sudo stat -c %a "$DIR/famalio.env")" = 600
+          for f in postgres_superuser_password famalio_owner_password famalio_app_password; do
+            v="$(sudo cat "$DIR/secrets/$f")"
+            test "${#v}" -eq 64
+            if grep -qF "$v" install.log; then echo "secret $f leaked into output"; exit 1; fi
+          done
+          sudo sha256sum "$DIR"/secrets/* > secrets-before.sha
+          # PostgreSQL must not be published on the host.
+          if ss -ltn | grep -q ':5432 '; then echo "postgres is published"; exit 1; fi
+          systemctl list-timers --all | grep famalio-home-backup
+      - name: Re-run is idempotent (keeps secrets and data)
+        run: |
+          set -eu
+          sudo ./install.sh --non-interactive --dir "$DIR" --source "$GITHUB_WORKSPACE" | tee rerun.log
+          grep -q 'Mode:            local' rerun.log
+          sudo sha256sum "$DIR"/secrets/* | diff - secrets-before.sha
+          curl -fsS http://127.0.0.1:8787/health/live
+      - name: Backup and restore (documented commands)
+        run: |
+          set -eu
+          dump="$(sudo "$DIR/backup.sh")"
+          echo "dump: $dump"
+          sudo test -s "$dump"
+          cd "$DIR/app/standalone"
+          sudo docker compose stop famalio-server
+          sudo sh -c "docker compose exec -T -u postgres postgres pg_restore --clean --if-exists --single-transaction --exit-on-error -d famalio < '$dump'"
+          sudo docker compose start famalio-server
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8787/health/live && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8787/health/live
+          sudo docker compose exec -T -u postgres postgres psql -d famalio -Atc "select count(*) from information_schema.tables where table_schema='famalio'"
+      - name: Switch to domain mode (Caddy, local CA for "localhost")
+        run: |
+          set -eu
+          sudo ./install.sh --non-interactive --mode domain --domain localhost --email ci@example.com --dir "$DIR" --source "$GITHUB_WORKSPACE"
+          curl -kfsS https://localhost/health/live
+          echo
+          cd "$DIR/app/standalone" && sudo docker compose ps
+      - name: Update (keeps data and secrets)
+        run: |
+          set -eu
+          sudo ./install.sh --update --non-interactive --mode local --dir "$DIR" --source "$GITHUB_WORKSPACE"
+          sudo sha256sum "$DIR"/secrets/* | diff - secrets-before.sha
+          curl -fsS http://127.0.0.1:8787/health/live
+          if curl -ksS -o /dev/null https://localhost/health/live 2>/dev/null; then echo "caddy still running in local mode"; exit 1; fi
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cd "$DIR/app/standalone" 2>/dev/null && sudo docker compose --profile domain --profile tailscale logs --no-color --tail 200 || true
+      - name: Uninstall with purge
+        run: |
+          set -eu
+          sudo ./install.sh --uninstall --purge --non-interactive --dir "$DIR"
+          test ! -e "$DIR"
+          if sudo docker volume ls -q | grep -q '^famalio-home_pgdata$'; then echo "volume left behind"; exit 1; fi
+          test ! -e /etc/systemd/system/famalio-home-backup.timer
+
+  installer-distros:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - debian:12
+          - ubuntu:24.04
+          - ubuntu:20.04
+          - fedora:40
+          - rockylinux:9
+          - almalinux:8
+          - opensuse/leap:15.6
+          - archlinux:latest
+          - alpine:3.20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect OS and install base tools in ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD:/src:ro" "${{ matrix.image }}" sh -c '
+            set -e
+            cd /src
+            sh ./install.sh --check-only
+            sh ./install.sh --prereqs-only
+            sh ./install.sh --check-only | tee /tmp/check.log
+            grep -q "Package manager: " /tmp/check.log
+            ! grep -q "family=unknown" /tmp/check.log
+            command -v curl && command -v tar && command -v openssl
+          '
