@@ -3,9 +3,9 @@
 # Least privilege (SEC-07/SEC-09, ADR-002 §3): ingress is reserved for the
 # authenticated, source-filtered setup wizard. Discovery hands the scoped
 # read-only grant to Famalio Core. No Core/Docker API, host network/ports,
-# extra capabilities, or host mappings.
+# extra capabilities, and only ONE host mapping (see `map:` below).
 name: Famalio
-version: "0.3.0"
+version: "0.4.0"
 slug: famalio_home
 url: https://github.com/fisch192/famalio-home
 description: Self-hosted Famalio family calendar server (PostgreSQL + API)
@@ -42,7 +42,14 @@ auth_api: false
 docker_api: false
 full_access: false
 apparmor: true
-map: []
+# The only host mapping: Home Assistant's config folder, read-write, so the add-on
+# can copy its own bundled integration (custom_components/famalio) into place on
+# every start (only if missing or older; a newer copy is never overwritten).
+# Nothing else in that folder is read, listed or changed.
+map:
+  - type: homeassistant_config
+    read_only: false
+    path: /homeassistant
 options:
   unauthenticated_rate_per_minute: 20
   max_body_megabytes: 8

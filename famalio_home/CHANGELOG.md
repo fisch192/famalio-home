@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0
+
+- **Self-setup.** The add-on bundles the Home Assistant integration and copies it into
+  `/homeassistant/custom_components/famalio` on every start if it is missing or older. A copy with the
+  same or a newer version (HACS, manual) is never overwritten. HACS is now optional.
+  New permission (least privilege): `map: homeassistant_config` read-write, used only for this copy.
+- **Restart prompt.** When the integration is installed but Home Assistant has not loaded it, the panel
+  shows one button, **Home Assistant neu starten**, and continues by itself after the restart.
+- **Setup code in the panel.** The one-time owner setup code is shown in the panel together with the server
+  address, copy buttons and a QR code (`famalio://home-setup?url=...&code=...`) for the app's **Scan setup
+  code**; no more reading the add-on log. The code stays valid for 24 hours in the add-on and is only
+  handed over through a private file, never through the API or the relay.
+- Redesigned guided panel: three steps with one obvious action at a time, large type, plain language;
+  technical details are collapsed. The connection code is also shown on the calendar page while it waits
+  for approval in the app.
+- Linux installer: prints a QR code for the app when `qrencode` is installed.
+- README rewritten as a step-by-step guide, including moving from an old local add-on install.
+
 ## 0.3.0
 
 - First public release of the Famalio Home add-on repository.

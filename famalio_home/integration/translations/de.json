@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Famalio Home verbinden",
+        "description": "Verwende eine HTTPS-Serveradresse und ein Integrationstoken, das ein Famalio-Familien-Owner erstellt hat.",
+        "data": {
+          "url": "HTTPS-Serveradresse",
+          "api_key": "Integrationstoken"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Famalio-Home-Zugriff erneuern",
+        "description": "Erstelle in Famalio ein neues Integrationstoken und gib es hier ein.",
+        "data": {
+          "url": "HTTPS-Serveradresse",
+          "api_key": "Neues Integrationstoken"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Famalio-Kalender verbinden",
+        "description": "Der Installationsassistent hat den Zugriff auf {url} vorbereitet. Bestätige, um den Kalender hinzuzufügen. Eine bestehende Verbindung derselben Familie wird aktualisiert."
+      }
+    },
+    "error": {
+      "invalid_url": "Gib einen HTTPS-Ursprung ohne Pfad ein.",
+      "invalid_auth": "Das Integrationstoken ist ungültig oder widerrufen.",
+      "server_changed": "Dieses Token gehört zu einer anderen Famalio-Familie oder einem anderen Server. Entferne diesen Eintrag und füge den anderen Server separat hinzu.",
+      "cannot_connect": "Verbindung fehlgeschlagen oder ungültige Serverantwort."
+    },
+    "abort": {
+      "already_configured": "Diese Famalio-Integration ist bereits eingerichtet.",
+      "reauth_successful": "Der Zugriff auf Famalio Home wurde erneuert.",
+      "invalid_discovery": "Der Installationsassistent hat ungültige Verbindungsdaten übermittelt.",
+      "already_in_progress": "Eine Verbindung zu dieser Familie wird bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Kalender-Aktualisierungsintervall",
+        "description": "Wie oft Home Assistant Famalio Home auf Kalenderänderungen prüft. Wähle zwischen 30 und 3600 Sekunden.",
+        "data": {
+          "scan_interval": "Prüfintervall (Sekunden)"
+        }
+      }
+    }
+  }
+}

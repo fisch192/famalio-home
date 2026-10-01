@@ -5,52 +5,56 @@ The add-on runs PostgreSQL 16 and the Famalio API in one container, plus a
 guided setup page and a calendar workspace in the Home Assistant sidebar. You
 never create database users or passwords.
 
-> **Status: experimental (0.3.0).** The amd64 build has been run on Home
+> **Status: experimental (0.4.0).** The amd64 build has been run on Home
 > Assistant OS. The `aarch64` build, restore from backup and long-term load are
 > not verified yet. Keep your Famalio cloud data; do not treat this as your only
 > copy of the calendar.
 
 Full step-by-step guide: <https://github.com/fisch192/famalio-home>
 
-## First start
+## First start (three steps in the Famalio panel)
 
-1. Start the add-on and open **Famalio** in the Home Assistant sidebar (or
-   **Open Web UI**). The page is only available to Home Assistant
-   administrators.
-2. Open the **Log** tab. On the first start the add-on prints a one-time
-   **owner setup code** (valid 30 minutes, single use). In the Famalio app open
-   **Settings → Famalio Home → Home server connection**, enter the server
-   address shown by the wizard and the setup code. The app then shows a
+Open **Famalio** in the Home Assistant sidebar (or **Open Web UI**). The page is
+only available to Home Assistant administrators and guides you through three
+steps, one at a time:
+
+1. **Zugang einrichten** (access). Click the button, sign in to Tailscale and,
+   if asked, enable HTTPS certificates for your tailnet. The add-on joins your
+   tailnet as its own device; every phone needs the Tailscale app on the same
+   tailnet. Advanced: **Erweitert: eigene HTTPS-Adresse verwenden** for a
+   reverse proxy you already run (publicly trusted certificate; point its
+   upstream to the host name and port under *Technische Details*).
+2. **Home Assistant neu starten.** The add-on copies the bundled Famalio
+   integration into `custom_components/famalio` of your Home Assistant
+   configuration (see Permissions). Home Assistant must restart once to load
+   it; the panel shows one button and continues by itself afterwards.
+3. **Famalio-App verbinden.** The panel shows the server address, the
+   one-time owner setup code (valid 24 hours, single use, only while no owner
+   exists) and a QR code. In the Famalio app open **Settings → Famalio Home →
+   Home server connection**, tap **Scan setup code** and scan it (or enter the
+   address and the code by hand), then **Create Home family**. The app shows a
    **recovery code once**. Write it down; it restores owner access if every
    device is lost.
-3. In the wizard choose how phones reach the server over HTTPS:
-   - **Tailscale (recommended):** the add-on joins your tailnet as its own
-     device. Open the sign-in link shown in the wizard, approve the device and,
-     if asked, enable HTTPS certificates for your tailnet. Every phone needs the
-     Tailscale app on the same tailnet.
-   - **Existing HTTPS reverse proxy (advanced):** use a proxy you already run
-     on the Home Assistant app network with a publicly trusted certificate.
-     Point its upstream to the internal host name and port shown in the wizard.
-     Do not publish a port on the host or router.
 
 ## Connect Home Assistant (one click)
 
-1. Install the **Famalio Home** integration (HACS or manual copy, see the
-   guide) and restart Home Assistant.
-2. In the Famalio panel choose **Einrichtung → Mit Famalio verbinden**. The
-   panel shows a short code.
-3. In the Famalio app open **Settings → Famalio Home → Home server connection →
-   Home Assistant** and approve the code. Choose the calendars, the detail level
-   (full details or *Busy* only), the time range and optionally **Allow Home
-   Assistant to edit**.
-4. The add-on collects the approved grant once, hands it to Home Assistant
+1. In the Famalio panel, step 3 **Home Assistant verbinden**, click **Mit
+   Famalio verbinden**. The panel shows a short code (also shown at the top of
+   the calendar page while it waits).
+2. In the Famalio app open **Settings → Famalio Home → Home server connection →
+   Connection requests** and approve the request with that code. Choose the
+   calendars, the detail level (full details or busy times only), the time
+   range and optionally **Allow Home Assistant to edit**.
+3. The add-on collects the approved grant once, hands it to Home Assistant
    through Supervisor discovery and the panel confirms the integration itself.
-   No token is copied by hand. Manual token entry remains available under a
-   disclosure for advanced cases.
+   No token is copied by hand. Manual token entry remains available under
+   **Erweitert** for advanced cases.
+
+HACS is optional: a copy installed by HACS or by hand with the same or a newer
+version is never overwritten by the add-on.
 
 Discovery alone does not count as completed setup: the panel switches to the
 calendar only after Home Assistant has registered a Famalio calendar entity.
-**Einrichtung** stays available in the header.
 
 ## Calendar
 
@@ -74,8 +78,11 @@ immediately.
 
 ## Permissions
 
-No Docker API, host networking, host ports, hardware access, host folders,
-Home Assistant Core API or general Supervisor API. AppArmor stays on. Ingress
+One host folder: Home Assistant's configuration folder (`homeassistant_config`,
+read-write), used only to copy this add-on's own integration into
+`custom_components/famalio` when missing or older (a newer copy is never
+overwritten; nothing else in that folder is read or changed). No Docker API,
+host networking, host ports, hardware access, Home Assistant Core API or general Supervisor API. AppArmor stays on. Ingress
 serves only the administrator setup page and calendar workspace. Supervisor
 discovery is allowed for the `famalio` service only. PostgreSQL uses a Unix
 socket without TCP listener or password. The internal TLS relay used by Home

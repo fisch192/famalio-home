@@ -12,6 +12,11 @@ PG_HBA_FILE="${PG_HBA_FILE:-/etc/famalio/pg_hba.conf}"
 FAMALIO_APP_DIR="${FAMALIO_APP_DIR:-/opt/famalio}"
 FAMALIO_OPTIONS_FILE="${FAMALIO_OPTIONS_FILE:-${FAMALIO_DATA_DIR}/options.json}"
 FAMALIO_SETUP_DIR="${FAMALIO_SETUP_DIR:-${FAMALIO_DATA_DIR}/setup}"
+# One-time owner setup code handed from the API (famalio_app) to the setup panel
+# (famalio_ts) via a file; the directory is group-readable by famalio_ts only.
+FAMALIO_CODE_DIR="${FAMALIO_CODE_DIR:-${FAMALIO_DATA_DIR}/setup-code}"
+FAMALIO_SETUP_CODE_FILE="${FAMALIO_SETUP_CODE_FILE:-${FAMALIO_CODE_DIR}/owner-setup.json}"
+FAMALIO_INTEGRATION_SRC="${FAMALIO_INTEGRATION_SRC:-/opt/famalio-integration/famalio}"
 FAMALIO_SETUP_CONFIG="${FAMALIO_SETUP_CONFIG:-${FAMALIO_SETUP_DIR}/config.json}"
 # Tool that drops to an unprivileged account: "$FAMALIO_SETUIDGID" <user> <cmd...>
 FAMALIO_SETUIDGID="${FAMALIO_SETUIDGID:-s6-setuidgid}"

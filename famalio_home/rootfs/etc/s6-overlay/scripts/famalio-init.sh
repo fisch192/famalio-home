@@ -33,3 +33,4 @@ fi
 install -d -o "$FAMALIO_TS_USER" -g "$FAMALIO_TS_USER" -m 0700 "$TS_STATE_DIR"
 install -d -o "$FAMALIO_TS_USER" -g "$FAMALIO_TS_USER" -m 0750 "$TS_RUN_DIR"
 install -d -o "$FAMALIO_TS_USER" -g "$FAMALIO_TS_USER" -m 0700 "$FAMALIO_SETUP_DIR"
+install -d -o famalio_app -g "$FAMALIO_TS_USER" -m 2750 "$FAMALIO_CODE_DIR"

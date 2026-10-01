@@ -31,5 +31,9 @@ export FAMALIO_HOST="${FAMALIO_HOST:-$default_host}"
 export FAMALIO_PORT="${FAMALIO_PORT:-8787}"
 export FAMALIO_UNAUTHENTICATED_RATE_PER_MINUTE="$rate"
 export FAMALIO_MAX_BODY_BYTES="$((body_mb * 1024 * 1024))"
+# The setup code stays valid 24 h (default 30 min) because it is shown in the
+# admin-only setup panel instead of a log that has to be read in time.
+export FAMALIO_SETUP_TTL_SECONDS="${FAMALIO_SETUP_TTL_SECONDS:-86400}"
+export FAMALIO_SETUP_CODE_FILE
 unset FAMALIO_OWNER_DATABASE_URL
 exec "$FAMALIO_SETUIDGID" famalio_app node src/main.ts
