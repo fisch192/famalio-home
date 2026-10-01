@@ -94,7 +94,7 @@ jobs:
             test "${#v}" -eq 64
             if grep -qF "$v" install.log; then echo "secret $f leaked into output"; exit 1; fi
           done
-          sudo sha256sum "$DIR"/secrets/* > secrets-before.sha
+          sudo sh -c "sha256sum $DIR/secrets/*" > secrets-before.sha
           # PostgreSQL must not be published on the host.
           if ss -ltn | grep -q ':5432 '; then echo "postgres is published"; exit 1; fi
           systemctl list-timers --all | grep famalio-home-backup
@@ -103,7 +103,7 @@ jobs:
           set -eu
           sudo ./install.sh --non-interactive --dir "$DIR" --source "$GITHUB_WORKSPACE" | tee rerun.log
           grep -q 'Mode:            local' rerun.log
-          sudo sha256sum "$DIR"/secrets/* | diff - secrets-before.sha
+          sudo sh -c "sha256sum $DIR/secrets/*" | diff - secrets-before.sha
           curl -fsS http://127.0.0.1:8787/health/live
       - name: Backup and restore (documented commands)
         run: |
@@ -129,7 +129,7 @@ jobs:
         run: |
           set -eu
           sudo ./install.sh --update --non-interactive --mode local --dir "$DIR" --source "$GITHUB_WORKSPACE"
-          sudo sha256sum "$DIR"/secrets/* | diff - secrets-before.sha
+          sudo sh -c "sha256sum $DIR/secrets/*" | diff - secrets-before.sha
           curl -fsS http://127.0.0.1:8787/health/live
           if curl -ksS -o /dev/null https://localhost/health/live 2>/dev/null; then echo "caddy still running in local mode"; exit 1; fi
       - name: Logs on failure

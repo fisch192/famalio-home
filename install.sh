@@ -113,7 +113,7 @@ parse_args() {
     *) die "--dir must be an absolute path" ;;
   esac
   DIR="${DIR%/}"
-  [ -n "$DIR" ] && [ "$DIR" != "/" ] || die "refusing to use / as install directory"
+  if [ -z "$DIR" ] || [ "$DIR" = "/" ]; then die "refusing to use / as install directory"; fi
   if [ -n "$SOURCE" ]; then
     [ -f "$SOURCE/standalone/compose.yaml" ] || die "--source $SOURCE does not look like a famalio-home checkout"
     SOURCE="$(cd "$SOURCE" && pwd)"
@@ -729,6 +729,12 @@ print_summary() {
 EOF
 }
 
+copy_installer() {
+  if cp "$DIR/app/install.sh" "$DIR/install.sh" 2>/dev/null; then
+    chmod 0755 "$DIR/install.sh"
+  fi
+}
+
 do_install() {
   install_prereqs
   install_docker
@@ -744,7 +750,7 @@ do_install() {
   else
     info "Keeping the installed version in $DIR/app (use --update for a new one)."
   fi
-  cp "$DIR/app/install.sh" "$DIR/install.sh" 2>/dev/null && chmod 0755 "$DIR/install.sh" || true
+  copy_installer
   write_env
   make_secrets
   preflight_domain
@@ -769,7 +775,7 @@ do_update() {
   [ ! -d "$DIR/app" ] || mv "$DIR/app" "$DIR/app.old"
   mv "$DIR/app.new" "$DIR/app"
   ln -sfn "$DIR/famalio.env" "$DIR/app/standalone/.env"
-  cp "$DIR/app/install.sh" "$DIR/install.sh" 2>/dev/null && chmod 0755 "$DIR/install.sh" || true
+  copy_installer
   write_env
   make_secrets
   install_backup_schedule
