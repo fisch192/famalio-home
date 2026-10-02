@@ -9,6 +9,7 @@
     <title>Famalio</title>
     <link rel="stylesheet" href="./wizard.css">
     <link rel="stylesheet" href="./calendar.css">
+    <script src="./i18n.js" type="module"></script>
     <script src="./wizard.js" type="module"></script>
     <script src="./workspace.js" defer></script>
     <script src="./setup-panel.js" type="module"></script>
@@ -22,6 +23,7 @@
           <button type="button" id="nav-calendar">Kalender</button>
           <button type="button" id="nav-settings" aria-current="page">Einrichtung</button>
         </nav>
+        <button type="button" id="lang-toggle" class="lang-toggle" aria-label="Language / Sprache" title="Language / Sprache">EN</button>
         <a class="ha-link" href="/config/automation/dashboard" target="_top">HA-Automationen <span aria-hidden="true">↗</span></a>
       </header>
       <div id="pending-banner" class="pending-banner" role="status" aria-live="polite" hidden><span class="pending-text"><strong>Home Assistant wartet auf dich.</strong> Öffne die Famalio-App: Einstellungen → Famalio Home → Home-Server verbinden → Verbindungsanfragen → <em>Verbindung erlauben</em>. Der Code muss gleich sein:</span><strong id="pending-code" class="pending-code"></strong></div>

@@ -8,6 +8,7 @@ import { loadConfig, type Config } from './config.ts';
 import { createPool } from './db.ts';
 import { listener } from './http.ts';
 import { compactJournal } from './records.ts';
+import { createConsoleLog } from './logfmt.ts';
 
 /**
  * Hands the one-time owner setup code to a co-located process (the Home Assistant add-on's
@@ -31,7 +32,12 @@ export function publishSetupCode(file: string | undefined, code: string | null, 
   }
 }
 
-export async function start(config: Config, log: (line: object) => void = (l) => console.log(JSON.stringify(l))) {
+/** Readable labelled lines by default; FAMALIO_LOG_FORMAT=json keeps the raw machine-readable lines. */
+export const consoleLog: (line: object) => void = process.env.FAMALIO_LOG_FORMAT === 'json'
+  ? (line) => console.log(JSON.stringify(line))
+  : createConsoleLog((text) => console.log(text));
+
+export async function start(config: Config, log: (line: object) => void = consoleLog) {
   const db = createPool(config.databaseUrl);
   const { router, auth } = buildRouter(db, config);
   const handler = listener(router, config.maxBodyBytes, log);
@@ -68,7 +74,7 @@ export async function start(config: Config, log: (line: object) => void = (l) =>
 if (import.meta.url === `file://${process.argv[1]}`) {
   const config = loadConfig();
   const running = await start(config);
-  console.log(JSON.stringify({ event: 'listening', host: config.host, port: running.port }));
+  consoleLog({ event: 'listening', host: config.host, port: running.port });
   if (running.setupCode) {
     // Local console only (HA add-on log / docker logs). Valid once, for a limited time.
     console.log(`\nFamalio Home owner setup code (valid ${Math.round(config.setupTtlSeconds / 60)} min, single use):\n${running.setupCode}\n`);

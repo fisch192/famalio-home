@@ -56,6 +56,7 @@ FAMALIO_TS_USER="${FAMALIO_TS_USER:-famalio_ts}"
 # String option from the Supervisor-written options.json; prints "" if absent.
 opt_str() { # <key>
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const [file, key] = process.argv.slice(1);
     let v; try { v = JSON.parse(require("fs").readFileSync(file, "utf8"))[key]; } catch {}
     process.stdout.write(typeof v === "string" ? v : "");
@@ -65,6 +66,7 @@ opt_str() { # <key>
 remote_access_mode() {
   local mode
   mode="$(node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const fs = require("fs");
     try {
       const c = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -84,6 +86,7 @@ remote_access_mode() {
 
 setup_https_url() {
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const fs = require("fs");
     try {
       const c = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
