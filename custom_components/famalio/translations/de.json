@@ -1,14 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "Mit Famalio Home verbinden",
-        "description": "Verwende eine HTTPS-Serveradresse und ein Integrationstoken, das ein Famalio-Familien-Owner erstellt hat.",
-        "data": {
-          "url": "HTTPS-Serveradresse",
-          "api_key": "Integrationstoken"
-        }
-      },
       "reauth_confirm": {
         "title": "Famalio-Home-Zugriff erneuern",
         "description": "Erstelle in Famalio ein neues Integrationstoken und gib es hier ein.",
@@ -20,6 +12,22 @@
       "hassio_confirm": {
         "title": "Famalio-Kalender verbinden",
         "description": "Der Installationsassistent hat den Zugriff auf {url} vorbereitet. Bestätige, um den Kalender hinzuzufügen. Eine bestehende Verbindung derselben Familie wird aktualisiert."
+      },
+      "user": {
+        "title": "Famalio Home einrichten",
+        "description": "Famalio Home braucht den Famalio-Server. Installiere ihn automatisch auf diesem Home Assistant oder verbinde einen Server, den du schon betreibst.",
+        "menu_options": {
+          "install_app": "Famalio-Server auf diesem Home Assistant installieren (empfohlen)",
+          "manual": "Ich habe schon einen Famalio-Server"
+        }
+      },
+      "manual": {
+        "title": "Mit Famalio Home verbinden",
+        "description": "Verwende eine HTTPS-Serveradresse und einen Integrationstoken, den ein Famalio-Familienorganisator erstellt hat.",
+        "data": {
+          "url": "HTTPS-Serveradresse",
+          "api_key": "Integrationstoken"
+        }
       }
     },
     "error": {
@@ -32,7 +40,13 @@
       "already_configured": "Diese Famalio-Integration ist bereits eingerichtet.",
       "reauth_successful": "Der Zugriff auf Famalio Home wurde erneuert.",
       "invalid_discovery": "Der Installationsassistent hat ungültige Verbindungsdaten übermittelt.",
-      "already_in_progress": "Eine Verbindung zu dieser Familie wird bereits eingerichtet."
+      "already_in_progress": "Eine Verbindung zu dieser Familie wird bereits eingerichtet.",
+      "app_installed": "Der Famalio-Server ist installiert und läuft. Öffne Famalio in der Home-Assistant-Seitenleiste und folge den drei Schritten dort.",
+      "install_failed": "Der Famalio-Server konnte nicht automatisch installiert werden ({error}). Füge https://github.com/fisch192/famalio-home unter Einstellungen, Apps, App installieren, Menü, Repositories hinzu und installiere Famalio dort.",
+      "no_supervisor": "Dieser Home Assistant hat keinen Supervisor, hier lassen sich keine Apps installieren. Installiere den Famalio-Server mit dem Linux-Installer oder Docker Compose von https://github.com/fisch192/famalio-home und füge diese Integration danach erneut hinzu."
+    },
+    "progress": {
+      "install_app": "Der Famalio-Server wird installiert. Die App wird dazu auf deinem Home Assistant gebaut, das dauert 10 bis 20 Minuten. Du kannst diese Seite offen lassen oder schließen."
     }
   },
   "options": {

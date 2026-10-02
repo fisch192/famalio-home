@@ -99,6 +99,19 @@ Famalio Home has **two parts**, and they are installed in **two different places
 So the order is always: **add this repository to the App store, install the app, start it.** The
 integration and the sidebar entry then appear by themselves.
 
+#### Shortcut: install through HACS (one dialog)
+
+If you use [HACS](https://hacs.xyz), you can skip Steps 1 and 2:
+
+1. In HACS add this repository as a custom repository (category **Integration**), download **Famalio Home**
+   and restart Home Assistant.
+2. **Settings → Devices & services → Add integration → Famalio Home.** Choose **Install the Famalio server on this
+   Home Assistant.** The integration adds the repository to the App store, installs and starts the app and
+   switches on its sidebar entry. This builds the app on your Home Assistant and takes 10 to 20 minutes.
+3. Open **Famalio** in the sidebar and continue with [Step 3](#step-3-open-the-famalio-panel-and-set-up-access).
+
+Without HACS, do Steps 1 and 2 by hand.
+
 ### Step 1. Add the repository to the App store (not to HACS)
 
 Click this button (it opens your Home Assistant):

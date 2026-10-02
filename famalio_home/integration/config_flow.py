@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from typing import Any
 from uuid import UUID
 
+import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_API_KEY, CONF_URL
@@ -14,9 +17,33 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .api import FamalioApi, FamalioApiError, FamalioAuthError, normalize_origin, normalize_internal_origin
+from .app_installer import AppInstallError, app_slug, ensure_app_running
 from .const import CONF_ADDON_SLUG, CONF_INTERNAL_URL, CONF_FAMILY_ID, CONF_INSTANCE_ID, CONF_INTEGRATION_ID, CONF_MAX_DAYS, CONF_PROJECTION, CONF_RECOVERY_EPOCH, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+SUPERVISOR_URL = "http://supervisor"
+
+
+def _supervisor_request(hass: HomeAssistant):
+    """Return a Supervisor API caller that unwraps `data`, or None without a Supervisor."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return None
+    session = async_get_clientsession(hass)
+
+    async def request(method: str, path: str, body: dict[str, Any] | None, timeout: float) -> Any:
+        async with session.request(method, f"{SUPERVISOR_URL}{path}", json=body,
+                                   headers={"Authorization": f"Bearer {token}"},
+                                   timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+            payload = await response.json(content_type=None)
+        if response.status >= 400 or not isinstance(payload, dict) or payload.get("result") != "ok":
+            message = payload.get("message") if isinstance(payload, dict) else None
+            raise AppInstallError("supervisor", f"HTTP {response.status} {message or ''}".strip())
+        return payload.get("data")
+
+    return request
 
 
 async def _validate(hass: HomeAssistant, origin: str, token: str,
@@ -64,6 +91,10 @@ class FamalioConfigFlow(ConfigFlow, domain=DOMAIN):
     """Configure an owner-created, read-only Famalio integration token."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._install_task: asyncio.Task | None = None
+        self._install_error = ""
 
     @staticmethod
     @callback
@@ -124,7 +155,48 @@ class FamalioConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="hassio_confirm", data_schema=vol.Schema({}),
                                     errors=errors, description_placeholders={"url": data[CONF_URL]})
 
+    async def _app_missing(self) -> bool:
+        """True when this Home Assistant has a Supervisor but the Famalio app is not installed."""
+        request = _supervisor_request(self.hass)
+        if request is None:
+            return False
+        try:
+            data = await request("GET", "/addons", None, 30)
+        except Exception:  # cannot tell: fall back to the manual form instead of blocking setup
+            return False
+        slug = app_slug()
+        return not any(item.get("slug") == slug for item in (data or {}).get("addons", []))
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is None and await self._app_missing():
+            return self.async_show_menu(step_id="user", menu_options=["install_app", "manual"])
+        return await self.async_step_manual(user_input)
+
+    async def async_step_install_app(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Add the repository, install and start the Famalio app, then show it in the sidebar."""
+        request = _supervisor_request(self.hass)
+        if request is None:
+            return self.async_abort(reason="no_supervisor")
+        if self._install_task is None:
+            self._install_task = self.hass.async_create_task(ensure_app_running(request))
+        if not self._install_task.done():
+            return self.async_show_progress(step_id="install_app", progress_action="install_app",
+                                            progress_task=self._install_task)
+        try:
+            await self._install_task
+        except AppInstallError as err:
+            self._install_error = str(err)
+            _LOGGER.warning("Famalio app installation failed: %s", err)
+            return self.async_show_progress_done(next_step_id="install_failed")
+        return self.async_show_progress_done(next_step_id="install_done")
+
+    async def async_step_install_done(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_abort(reason="app_installed")
+
+    async def async_step_install_failed(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_abort(reason="install_failed", description_placeholders={"error": self._install_error})
+
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
@@ -155,7 +227,7 @@ class FamalioConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_URL): str,
             vol.Required(CONF_API_KEY): str,
         })
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="manual", data_schema=schema, errors=errors)
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         self._reauth_entry = self._get_reauth_entry()
