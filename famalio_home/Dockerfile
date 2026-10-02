@@ -13,7 +13,7 @@
 #   ghcr.io/home-assistant/{aarch64|amd64}-base-debian:<version>
 # NODE_IMAGE must be pinned by digest for a release (TODO, see ../README.md).
 ARG BUILD_ARCH=amd64
-ARG BUILD_VERSION=0.5.1
+ARG BUILD_VERSION=0.5.2
 ARG BUILD_FROM=ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:bookworm
 ARG NODE_IMAGE=node:22-bookworm-slim
 # Official Tailscale image; only its two static binaries are copied (userspace

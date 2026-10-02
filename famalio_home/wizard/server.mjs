@@ -290,7 +290,11 @@ async function discoverHA(body) {
     await verifyURL(url, local.instance_id);
     grant = await fetchJSON(new URL('/v1/ha/calendars', url), { headers: { authorization: `Bearer ${body.integration_token}` } }, 8000);
   }
-  if (!validateGrant(grant, local.instance_id)) throw new Error('The scoped grant returned incomplete or mismatched instance metadata.');
+  if (!validateGrant(grant, local.instance_id)) {
+    const missing = ['instance_id', 'family_id', 'integration_id', 'recovery_epoch', 'projection', 'max_days', 'calendars'].filter(key => grant?.[key] == null);
+    const detail = missing.length ? `missing: ${missing.join(', ')}` : grant?.instance_id !== local.instance_id ? 'server identity differs' : 'a field has an invalid value';
+    throw new Error(`The scoped grant returned incomplete or mismatched instance metadata (${detail}).`);
+  }
   const discoveryConfig = { url, api_key: body.integration_token, instance_id: local.instance_id };
   if (cfg.mode === 'tailscale') {
     const ts = readJson(TS_STATUS); if (!safeDNS(ts?.self_dns_name)) throw new Error('Tailscale HTTPS identity is unavailable.');

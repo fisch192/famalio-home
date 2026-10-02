@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2
+
+- **Fixed: Home Assistant never connected.** After approving the code in the Famalio app, the server's
+  `/v1/ha/calendars` answer lacked `recovery_epoch`. The setup panel rejected it and silently stopped before
+  telling Home Assistant, so no "Famalio" entry was ever offered. The answer now carries the full identity.
+- The setup panel error now names the missing field instead of a generic message.
+- The app is no longer marked experimental.
+
 ## 0.5.1
 
 - **Readable server log.** The add-on log now shows labelled, plain lines and folds routine polling into one
