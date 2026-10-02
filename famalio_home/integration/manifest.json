@@ -1,15 +1,16 @@
 {
   "domain": "famalio",
   "name": "Famalio Home Calendar",
+  "after_dependencies": [
+    "hassio"
+  ],
   "codeowners": [
     "@fisch192"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/fisch192/familycalendar/tree/main/packaging/famalio-home/custom_components/famalio",
+  "documentation": "https://github.com/fisch192/famalio-home",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/fisch192/famalio-home/issues",
   "requirements": [],
-  "version": "0.5.0",
-  "after_dependencies": [
-    "hassio"
-  ]
+  "version": "0.5.1"
 }

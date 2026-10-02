@@ -352,7 +352,7 @@ async function pollConnection() {
 }
 function staticFile(req, res, pathname) {
   const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
-  const allowed = new Set(['index.html', 'wizard.js', 'wizard.css', 'workspace.js', 'calendar.js', 'calendar.css', 'calendar-helpers.js', 'setup-helpers.js', 'setup-panel.js', 'qrcode-vendor.js']);
+  const allowed = new Set(['index.html', 'wizard.js', 'wizard.css', 'workspace.js', 'calendar.js', 'calendar.css', 'calendar-helpers.js', 'setup-helpers.js', 'setup-panel.js', 'qrcode-vendor.js', 'i18n.js']);
   if (!allowed.has(rel)) return send(res, 404, { message: 'Not found.' });
   const file = path.join(ROOT, 'public', rel);
   try { const data = fs.readFileSync(file); const type = rel.endsWith('.js') ? 'text/javascript; charset=utf-8' : rel.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8'; res.writeHead(200, { 'content-type': type, 'content-length': data.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'", 'referrer-policy': 'no-referrer' }); res.end(data); } catch { send(res, 404, { message: 'Not found.' }); }

@@ -13,6 +13,7 @@ status_file="$FAMALIO_SETUP_DIR/integration.json"
 write_status() { # <state> <bundled> <installed>
   install -d -o "$FAMALIO_TS_USER" -g "$FAMALIO_TS_USER" -m 0700 "$FAMALIO_SETUP_DIR" 2>/dev/null || mkdir -p "$FAMALIO_SETUP_DIR"
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const [file, state, bundled, installed] = process.argv.slice(1);
     const fs = require("fs");
     fs.writeFileSync(file + ".tmp", JSON.stringify({ state, bundled_version: bundled || null, installed_version: installed || null }) + "\n", { mode: 0o600 });
@@ -21,12 +22,14 @@ write_status() { # <state> <bundled> <installed>
 }
 manifest_version() { # <dir>
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     try { const v = JSON.parse(require("fs").readFileSync(process.argv[1] + "/manifest.json", "utf8")).version; process.stdout.write(typeof v === "string" ? v : ""); } catch {}
   ' "$1"
 }
 # prints -1, 0 or 1 for <installed> vs <bundled>; non-numeric parts count as 0
 compare_versions() {
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const parse = (v) => String(v).split(/[.+-]/).slice(0, 4).map((x) => (/^\d+$/.test(x) ? Number(x) : 0));
     const a = parse(process.argv[1]), b = parse(process.argv[2]);
     let r = 0;

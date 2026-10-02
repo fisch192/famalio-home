@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+- **Readable server log.** The add-on log now shows labelled, plain lines and folds routine polling into one
+  summary line per minute. `FAMALIO_LOG_FORMAT=json` keeps the raw lines.
+- **English panel.** The setup panel is available in English and German, with a language toggle.
+- Fixed the harmless "write EPIPE" noise in the log when the add-on restarts.
+- The default rate limit for unauthenticated requests rose from 20 to 120 per minute; the panel's own polling
+  could hit the old limit (429).
+
 ## 0.5.0
 
 - **HACS now installs everything.** Adding the Famalio integration (installed from HACS) offers

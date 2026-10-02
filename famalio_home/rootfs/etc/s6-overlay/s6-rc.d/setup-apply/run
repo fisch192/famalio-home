@@ -9,6 +9,7 @@ set -euo pipefail
 applied="${FAMALIO_SETUP_APPLIED:-/run/famalio-setup-applied}"
 read_valid_config() {
   node -e '
+    process.stdout.on("error", () => {}); // a pipe closed during a restart is not an error
     const fs = require("fs");
     const { URL } = require("url");
     try {
