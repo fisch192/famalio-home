@@ -421,7 +421,7 @@ export class HomeAssistantCalendar {
     const grant = await this.authenticate(request);
     const active = await this.activeGrant(grant);
     const available = await this.availableCalendars(this.db, grant.family_id);
-    const instance = await this.db.query('select instance_id from famalio.instance');
+    const instance = await this.db.query('select instance_id, recovery_epoch from famalio.instance');
     return { instance_id: instance.rows[0]?.instance_id, recovery_epoch: instance.rows[0]?.recovery_epoch,
       family_id: grant.family_id, integration_id: grant.id,
       projection: grant.projection, max_days: grant.max_days, access: grant.access,
