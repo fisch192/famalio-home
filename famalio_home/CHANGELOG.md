@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- **HACS now installs everything.** Adding the Famalio integration (installed from HACS) offers
+  **Install the Famalio server on this Home Assistant**. It adds this repository to the app store,
+  installs and starts the Famalio app, and switches on its sidebar entry. The first install builds the
+  app on your Home Assistant and takes 10 to 20 minutes; the dialog shows progress. Choose
+  **I already have a Famalio server** to enter an address and token as before.
+- Added `translations/en.json` so the integration's setup dialogs show English text.
+
 ## 0.4.0
 
 - **Self-setup.** The add-on bundles the Home Assistant integration and copies it into

@@ -1,14 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "Connetti a Famalio Home",
-        "description": "Usa un indirizzo HTTPS e un token di integrazione creato da un proprietario della famiglia Famalio.",
-        "data": {
-          "url": "Indirizzo HTTPS del server",
-          "api_key": "Token di integrazione"
-        }
-      },
       "reauth_confirm": {
         "title": "Rinnova l'accesso a Famalio Home",
         "description": "Crea un nuovo token di integrazione in Famalio e inseriscilo qui.",
@@ -20,6 +12,22 @@
       "hassio_confirm": {
         "title": "Collega il calendario Famalio",
         "description": "La procedura guidata ha preparato l’accesso a {url}. Conferma per aggiungere il calendario. Una connessione esistente alla stessa famiglia verrà aggiornata."
+      },
+      "user": {
+        "title": "Configura Famalio Home",
+        "description": "Famalio Home richiede il server Famalio. Installalo automaticamente su questo Home Assistant oppure collega un server già in uso.",
+        "menu_options": {
+          "install_app": "Installa il server Famalio su questo Home Assistant (consigliato)",
+          "manual": "Ho già un server Famalio"
+        }
+      },
+      "manual": {
+        "title": "Collega a Famalio Home",
+        "description": "Usa un indirizzo server HTTPS e un token di integrazione creato dall’organizzatore della famiglia Famalio.",
+        "data": {
+          "url": "Indirizzo server HTTPS",
+          "api_key": "Token di integrazione"
+        }
       }
     },
     "error": {
@@ -32,7 +40,13 @@
       "already_configured": "Questa integrazione Famalio è già configurata.",
       "reauth_successful": "L'accesso a Famalio Home è stato rinnovato.",
       "invalid_discovery": "La procedura guidata ha fornito dati di connessione non validi.",
-      "already_in_progress": "È già in corso la configurazione di una connessione a questa famiglia."
+      "already_in_progress": "È già in corso la configurazione di una connessione a questa famiglia.",
+      "app_installed": "Il server Famalio è installato e in esecuzione. Apri Famalio nella barra laterale di Home Assistant e segui i tre passaggi.",
+      "install_failed": "Impossibile installare automaticamente il server Famalio ({error}). Aggiungi https://github.com/fisch192/famalio-home in Impostazioni, App, Installa app, menu, Repository e installa Famalio da lì.",
+      "no_supervisor": "Questo Home Assistant non ha un Supervisor, quindi qui non si possono installare app. Installa il server Famalio con l’installer Linux o Docker Compose da https://github.com/fisch192/famalio-home e aggiungi di nuovo questa integrazione."
+    },
+    "progress": {
+      "install_app": "Installazione del server Famalio in corso. L’app viene compilata sul tuo Home Assistant e richiede da 10 a 20 minuti. Puoi lasciare aperta questa pagina o chiuderla."
     }
   },
   "options": {

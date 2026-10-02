@@ -1,14 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "Connect to Famalio Home",
-        "description": "Use an HTTPS server address and an integration token created by a Famalio family owner.",
-        "data": {
-          "url": "HTTPS server address",
-          "api_key": "Integration token"
-        }
-      },
       "reauth_confirm": {
         "title": "Renew Famalio Home access",
         "description": "Create a new integration token in Famalio and enter it here.",
@@ -20,6 +12,22 @@
       "hassio_confirm": {
         "title": "Connect the Famalio calendar",
         "description": "The installation assistant prepared access to {url}. Confirm to add this calendar. An existing connection to the same family will be updated."
+      },
+      "user": {
+        "title": "Set up Famalio Home",
+        "description": "Famalio Home needs the Famalio server. Install it on this Home Assistant automatically, or connect a server you already run.",
+        "menu_options": {
+          "install_app": "Install the Famalio server on this Home Assistant (recommended)",
+          "manual": "I already have a Famalio server"
+        }
+      },
+      "manual": {
+        "title": "Connect to Famalio Home",
+        "description": "Use an HTTPS server address and an integration token created by a Famalio family owner.",
+        "data": {
+          "url": "HTTPS server address",
+          "api_key": "Integration token"
+        }
       }
     },
     "error": {
@@ -32,7 +40,13 @@
       "already_configured": "This Famalio integration is already configured.",
       "reauth_successful": "Famalio Home access was renewed.",
       "invalid_discovery": "The installation assistant supplied invalid connection information.",
-      "already_in_progress": "A connection to this family is already being configured."
+      "already_in_progress": "A connection to this family is already being configured.",
+      "app_installed": "The Famalio server is installed and running. Open Famalio in the Home Assistant sidebar and follow the three steps there.",
+      "install_failed": "The Famalio server could not be installed automatically ({error}). Add https://github.com/fisch192/famalio-home in Settings, Apps, Install app, menu, Repositories, then install Famalio there.",
+      "no_supervisor": "This Home Assistant has no Supervisor, so apps cannot be installed here. Install the Famalio server with the Linux installer or Docker Compose from https://github.com/fisch192/famalio-home and add this integration again."
+    },
+    "progress": {
+      "install_app": "Installing the Famalio server. This builds the app on your Home Assistant and can take 10 to 20 minutes. You can leave this page open or close it."
     }
   },
   "options": {
