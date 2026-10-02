@@ -87,17 +87,30 @@ You need: Home Assistant OS or Supervised with the add-on store (CPU `amd64` tes
 untested), about 1 GB free RAM, a few GB disk, and internet access (the add-on is built on your
 Home Assistant the first time, which takes several minutes).
 
-### Step 1. Add the repository
+### Which part comes from where (read this first)
+
+Famalio Home has **two parts**, and they are installed in **two different places**:
+
+| Part | What it does | Where you install it |
+|---|---|---|
+| **Famalio app (server)** | The server, the database and the **Famalio** entry in the sidebar | Home Assistant **App store / Add-on store**. Add this GitHub repository there once (Step 1). **HACS cannot install this part.** |
+| **Famalio integration** | Shows your Famalio calendars in Home Assistant | Installed **automatically** by the app. You do **not** need HACS. (HACS can install the same integration, but that alone gives you no server and no sidebar entry.) |
+
+So the order is always: **add this repository to the App store, install the app, start it.** The
+integration and the sidebar entry then appear by themselves.
+
+### Step 1. Add the repository to the App store (not to HACS)
 
 Click this button (it opens your Home Assistant):
 
 [![Add repository to my Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Ffisch192%2Ffamalio-home)
 
-Confirm with **Add**. Or do it by hand: **Settings → Add-ons → Add-on Store**, top right
+Confirm with **Add**. Or do it by hand: **Settings → Apps** (older versions: **Add-ons**) **→ Install app** (**Add-on Store**), top right
 **⋮ → Repositories**, paste `https://github.com/fisch192/famalio-home`, click **Add**, then **Close**.
 
-*You should now see* a new section **Famalio Home** at the bottom of the add-on store (reload the
-page if it is missing) with the add-on **Famalio**.
+*You should now see* the repository **Famalio Home** in the list. Open **⋮ → Check for updates** (or reload
+the page); a new section **Famalio Home** with the app **Famalio** appears at the bottom of the store.
+If it does not, see [Troubleshooting](#troubleshooting-home-assistant).
 
 ### Step 2. Install and start
 

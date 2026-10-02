@@ -43,7 +43,19 @@ Voraussetzungen: Home Assistant OS oder Supervised mit Add-on-Store (`amd64` get
 ungetestet), ca. 1 GB freier Arbeitsspeicher, einige GB Speicher und Internet (das Add-on wird beim
 ersten Mal auf deinem Home Assistant gebaut, das dauert einige Minuten).
 
-### Schritt 1. Repository hinzufügen
+### Was kommt woher (bitte zuerst lesen)
+
+Famalio Home besteht aus **zwei Teilen**, die an **zwei verschiedenen Orten** installiert werden:
+
+| Teil | Aufgabe | Wo du ihn installierst |
+|---|---|---|
+| **Famalio-App (Server)** | Server, Datenbank und der Eintrag **Famalio** in der Seitenleiste | Im **App-Store / Add-on-Store** von Home Assistant. Dieses GitHub-Repository dort einmal hinzufügen (Schritt 1). **HACS kann diesen Teil nicht installieren.** |
+| **Famalio-Integration** | Zeigt deine Famalio-Kalender in Home Assistant | Wird von der App **automatisch** installiert. HACS ist **nicht nötig**. (HACS kann dieselbe Integration installieren, bringt aber allein weder Server noch Seitenleisten-Eintrag.) |
+
+Die Reihenfolge ist also immer: **Repository zum App-Store hinzufügen, App installieren, starten.**
+Integration und Seitenleisten-Eintrag erscheinen danach von selbst.
+
+### Schritt 1. Repository zum App-Store hinzufügen (nicht zu HACS)
 
 Klicke auf den Button (er öffnet deinen Home Assistant):
 
@@ -52,8 +64,8 @@ Klicke auf den Button (er öffnet deinen Home Assistant):
 und bestätige mit **Hinzufügen**. Oder von Hand: **Einstellungen → Add-ons → Add-on-Store**, oben rechts
 **⋮ → Repositories**, `https://github.com/fisch192/famalio-home` einfügen, **Hinzufügen**, **Schließen**.
 
-*Du siehst jetzt* unten im Add-on-Store einen neuen Bereich **Famalio Home** mit dem Add-on **Famalio**
-(Seite neu laden, falls er fehlt).
+*Du siehst jetzt* das Repository **Famalio Home** in der Liste. Öffne **⋮ → Nach Updates suchen** (oder lade die
+Seite neu); unten im Store erscheint ein Bereich **Famalio Home** mit der App **Famalio**.
 
 ### Schritt 2. Installieren und starten
 
