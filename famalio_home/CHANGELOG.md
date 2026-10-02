@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3
+
+- **Open in the Famalio app.** On your phone, step 2 of the setup panel now has an **Open in the Famalio app**
+  button. The app opens with the server address and setup code filled in, so there is nothing to scan or type.
+  You still confirm with **Create Home family**.
+- **Smaller text.** The setup panel uses smaller type, so more of each step fits on screen.
+
 ## 0.5.2
 
 - **Fixed: Home Assistant never connected.** After approving the code in the Famalio app, the server's

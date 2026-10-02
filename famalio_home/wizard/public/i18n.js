@@ -109,6 +109,8 @@ export const EN = {
   "Schritt 2: Famalio-App verbinden": "Step 2: Connect the Famalio app",
   "Warte auf Schritt 1.": "Waiting for step 1.",
   "ADRESSE DEINES SERVERS": "YOUR SERVER ADDRESS",
+  "In der Famalio-App öffnen": "Open in the Famalio app",
+  "Am Handy: Tippe auf den Knopf. Die App füllt Adresse und Code aus, du bestätigst mit „Home-Familie erstellen“.": "On your phone: tap the button. The app fills in the address and code, and you confirm with \"Create Home family\".",
   "Kopieren": "Copy",
   "EINRICHTUNGSCODE (EINMALIG GÜLTIG)": "SETUP CODE (VALID ONCE)",
   "Der Einrichtungscode ist abgelaufen. Starte das Famalio-Add-on unter „Technische Details → Add-on verwalten“ einmal neu, dann erscheint hier ein neuer Code.": "The setup code has expired. Restart the Famalio app once under “Technical details → Manage app”, and a new code appears here.",
