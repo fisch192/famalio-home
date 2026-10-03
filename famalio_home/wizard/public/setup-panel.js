@@ -11,6 +11,9 @@ function drawQr(current) {
   const code = visibleSetupCode(current?.app);
   const link = code && current?.network?.verified === true ? buildSetupLink(current.network.https_url, code) : null;
   const qr = link ? qrPath(link) : null;
+  const open = $("open-in-app");
+  if (open) { if (link) open.setAttribute("href", link); else open.removeAttribute("href"); }
+  $("open-in-app-field")?.classList.toggle("hidden", !link);
   if (!qr) { path.setAttribute("d", ""); $("qr-box")?.classList.add("hidden"); return; }
   svg.setAttribute("viewBox", `0 0 ${qr.size} ${qr.size}`);
   path.setAttribute("d", qr.d);
