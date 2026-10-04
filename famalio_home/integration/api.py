@@ -52,6 +52,24 @@ def normalize_internal_origin(value: str, addon_slug: str) -> str:
     return expected
 
 
+async def _status_error(response: Any) -> str:
+    """Name the HTTP status and, for client errors, the server's own short reason.
+
+    The server only sends fixed, content-free messages (never tokens or event data), so
+    quoting it makes a rejected request diagnosable from the Home Assistant UI.
+    """
+    text = f"Famalio Home returned HTTP {response.status}"
+    if 400 <= response.status < 500:
+        try:
+            payload = await response.json(content_type=None)
+        except (ClientError, TimeoutError, ValueError):
+            return text
+        message = payload.get("message") if isinstance(payload, dict) else None
+        if isinstance(message, str) and message.strip():
+            return f"{text}: {' '.join(message.split())[:160]}"
+    return text
+
+
 class FamalioApi:
     """Calls only the scoped HA calendar routes; redirects are never followed."""
 
@@ -90,7 +108,7 @@ class FamalioApi:
                 if response.status == 409:
                     raise FamalioConflictError("Edit repeating or imported events in the Famalio app")
                 if response.status >= 300:
-                    raise FamalioApiError(f"Famalio Home returned HTTP {response.status}")
+                    raise FamalioApiError(await _status_error(response))
                 if response.status == 204:
                     return {}
                 payload = await response.json(content_type=None)

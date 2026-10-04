@@ -4,9 +4,10 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import unittest
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from events import clamp_interval, format_api_datetime, parse_event, write_payload
+from events import clamp_interval, format_api_datetime, parse_event, poll_window, write_payload
 
 
 class CalendarWireTests(unittest.TestCase):
@@ -52,6 +53,65 @@ class CalendarWireTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             format_api_datetime(datetime(2026, 9, 26, 10, 11, 12))
 
+
+
+ROME = ZoneInfo("Europe/Rome")
+SERVER_MARGIN = timedelta(seconds=1)
+
+
+def _server_accepts(start: datetime, end: datetime, now: datetime, max_days: int) -> bool:
+    """Mirror server/famalio-home/src/ha-calendar.ts events(): real instants, not wall clock."""
+    start_u, end_u, now_u = (value.astimezone(timezone.utc) for value in (start, end, now))
+    span = timedelta(days=max_days)
+    return (end_u > start_u and end_u - start_u <= span
+            and start_u >= now_u - span and end_u <= now_u + span)
+
+
+class DaylightSavingWindowTests(unittest.TestCase):
+    """Windows that cross a clock change must still fit the grant (the HTTP 400 regression)."""
+
+    def test_poll_window_fits_the_grant_across_the_autumn_clock_change(self) -> None:
+        for max_days in (1, 3, 7, 30, 45, 90):
+            for now in (datetime(2026, 10, 4, 17, 6, 48, 444000, tzinfo=ROME),
+                        datetime(2026, 10, 25, 1, 59, tzinfo=ROME),
+                        datetime(2026, 7, 29, 8, tzinfo=ROME),
+                        datetime(2027, 3, 20, 9, tzinfo=ROME)):
+                with self.subTest(max_days=max_days, now=now.isoformat()):
+                    start, end = poll_window(now, max_days)
+                    self.assertTrue(_server_accepts(start, end, now, max_days), (start, end))
+                    self.assertGreater(end - start, timedelta(0))
+
+    def test_poll_window_keeps_the_intended_look_back_and_look_ahead(self) -> None:
+        now = datetime(2026, 10, 4, 12, tzinfo=timezone.utc)
+        start, end = poll_window(now, 30)
+        self.assertEqual(now - start, timedelta(days=2))
+        self.assertEqual(end - now, timedelta(days=28))
+        start, end = poll_window(now, 2)
+        self.assertEqual(now - start, timedelta(0))
+        self.assertEqual(end - now, timedelta(days=2))
+
+    def test_poll_window_is_sent_in_utc_so_no_offset_shift_can_widen_it(self) -> None:
+        start, end = poll_window(datetime(2026, 10, 4, 17, tzinfo=ROME), 90)
+        self.assertEqual(start.utcoffset(), timedelta(0))
+        self.assertEqual(end.utcoffset(), timedelta(0))
+
+    def test_calendar_view_requests_are_clipped_inside_the_grant_across_the_clock_change(self) -> None:
+        now = datetime(2026, 10, 4, 17, tzinfo=ROME)
+        for max_days in (7, 30, 90):
+            # HA's calendar card asks for whole local months/years, far beyond the grant.
+            for requested in ((datetime(2026, 9, 1, tzinfo=ROME), datetime(2027, 1, 1, tzinfo=ROME)),
+                              (datetime(2026, 10, 1, tzinfo=ROME), datetime(2026, 11, 1, tzinfo=ROME)),
+                              (datetime(2026, 1, 1, tzinfo=ROME), datetime(2028, 1, 1, tzinfo=ROME))):
+                with self.subTest(max_days=max_days, requested=requested[0].isoformat()):
+                    window = clamp_interval(*requested, now, max_days)
+                    if window is not None:
+                        self.assertTrue(_server_accepts(*window, now, max_days), window)
+
+    def test_calendar_view_clipping_survives_the_spring_clock_change(self) -> None:
+        now = datetime(2027, 3, 20, 9, tzinfo=ROME)
+        window = clamp_interval(datetime(2027, 3, 1, tzinfo=ROME), datetime(2027, 6, 1, tzinfo=ROME), now, 45)
+        self.assertIsNotNone(window)
+        self.assertTrue(_server_accepts(*window, now, 45), window)  # type: ignore[misc]
 
 
 class WritePayloadTests(unittest.TestCase):

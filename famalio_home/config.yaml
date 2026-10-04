@@ -5,7 +5,7 @@
 # read-only grant to Famalio Core. No Core/Docker API, host network/ports,
 # extra capabilities, and only ONE host mapping (see `map:` below).
 name: Famalio
-version: "0.5.3"
+version: "0.5.4"
 slug: famalio_home
 url: https://github.com/fisch192/famalio-home
 description: Self-hosted Famalio family calendar server (PostgreSQL + API)

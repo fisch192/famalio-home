@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 
@@ -39,14 +39,34 @@ def format_api_datetime(value: datetime) -> str:
     return value.isoformat(timespec="milliseconds")
 
 
+def poll_window(now: datetime, max_days: int) -> tuple[datetime, datetime]:
+    """Return the coordinator's refresh window as UTC instants that fit the grant.
+
+    Date arithmetic on a local aware datetime is wall-clock arithmetic, so a window
+    that crosses a daylight-saving change would be an hour longer (or shorter) than
+    ``max_days`` on the wire and the server rejects it with HTTP 400. Do the math on
+    UTC instants instead.
+    """
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The window anchor must include a timezone")
+    now_utc = now.astimezone(timezone.utc)
+    past_days = min(2, max_days // 4)
+    return now_utc - timedelta(days=past_days), now_utc + timedelta(days=max_days - past_days)
+
+
 def clamp_interval(start: datetime, end: datetime, now: datetime, max_days: int) -> tuple[datetime, datetime] | None:
     """Return a safe intersection with the grant's rolling time window.
+
+    All arithmetic is done on UTC instants (see ``poll_window``); the result is UTC.
 
     HA calendar consumers may request arbitrary historical/future windows. The
     server enforces both a rolling +/- max_days horizon and a max_days query span;
     clip here so ordinary month/year browser requests do not mark the entity down.
     """
-    if not (start.tzinfo and end.tzinfo and now.tzinfo) or end <= start or max_days < 1:
+    if not (start.tzinfo and end.tzinfo and now.tzinfo) or max_days < 1:
+        return None
+    start, end, now = (value.astimezone(timezone.utc) for value in (start, end, now))
+    if end <= start:
         return None
     span = timedelta(days=max_days)
     # Keep a small allowance for network transit and server-side `now` checks;

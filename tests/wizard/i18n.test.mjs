@@ -65,3 +65,13 @@ test('no English text contains German leftovers', () => {
     assert.doesNotMatch(english, /[äöüß]/, `${german} -> ${english}`);
   }
 });
+
+test('English server messages are shown in German; German and unknown text stay unchanged', async () => {
+  const { fromServer, SERVER_DE } = await import('../../famalio_home/wizard/public/i18n.js');
+  assert.equal(fromServer('The request expired. Start a new one.'), 'Die Anfrage ist abgelaufen. Sende eine neue Anfrage.');
+  assert.equal(fromServer('HTTPS verification returned 502'), 'Die HTTPS-Prüfung antwortete mit Fehler 502.');
+  assert.equal(fromServer('  Not found.\n'), '  Nicht gefunden.\n');
+  assert.equal(fromServer('Schritt 1: Zugang einrichten'), 'Schritt 1: Zugang einrichten');
+  assert.equal(fromServer(undefined), undefined);
+  for (const [english, german] of Object.entries(SERVER_DE)) assert.ok(german && german !== english, english);
+});

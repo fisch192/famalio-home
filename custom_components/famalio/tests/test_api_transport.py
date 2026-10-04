@@ -60,6 +60,7 @@ class CalendarTransportTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.requests = []
         self.redirect = False
+        self.rejection = None
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(self.cert, self.key)
         self.server = await asyncio.start_server(self.handle, "127.0.0.1", 0, ssl=context)
@@ -75,6 +76,10 @@ class CalendarTransportTests(unittest.IsolatedAsyncioTestCase):
             self.requests.append(request)
             if self.redirect:
                 reply = b"HTTP/1.1 302 Found\r\nLocation: /redirect-target\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            elif self.rejection is not None:
+                body = self.rejection
+                reply = (b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: "
+                         + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body)
             else:
                 body = b'{"calendars":[]}'
                 reply = (b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
@@ -120,6 +125,21 @@ class CalendarTransportTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(FamalioApiError, "HTTP 302"):
                 await self.relay(session).calendars()
         self.assertEqual(len(self.requests), 1)
+
+    async def test_rejected_request_reports_the_servers_reason(self):
+        self.rejection = b'{"code":"INVALID_INPUT","message":"Requested interval exceeds this integration grant","request_id":"x"}'
+        async with self.session() as session:
+            api = FamalioApi(session, f"https://{PUBLIC_HOST}", "fhi_synthetic_test_only")
+            with self.assertRaisesRegex(FamalioApiError,
+                                        "HTTP 400: Requested interval exceeds this integration grant"):
+                await api.calendars()
+
+    async def test_rejection_without_a_readable_reason_still_reports_the_status(self):
+        self.rejection = b"not json"
+        async with self.session() as session:
+            api = FamalioApi(session, f"https://{PUBLIC_HOST}", "fhi_synthetic_test_only")
+            with self.assertRaisesRegex(FamalioApiError, r"^Famalio Home returned HTTP 400$"):
+                await api.calendars()
 
     async def test_normal_public_https_connection_still_works(self):
         async with self.session() as session:
