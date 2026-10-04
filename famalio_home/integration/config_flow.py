@@ -18,6 +18,7 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .api import FamalioApi, FamalioApiError, FamalioAuthError, normalize_origin, normalize_internal_origin
 from .app_installer import AppInstallError, app_slug, ensure_app_running
+from .discovery import is_known_connection
 from .const import CONF_ADDON_SLUG, CONF_INTERNAL_URL, CONF_FAMILY_ID, CONF_INSTANCE_ID, CONF_INTEGRATION_ID, CONF_MAX_DAYS, CONF_PROJECTION, CONF_RECOVERY_EPOCH, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -122,6 +123,9 @@ class FamalioConfigFlow(ConfigFlow, domain=DOMAIN):
                 data[CONF_ADDON_SLUG] = discovery_info.slug
         except (KeyError, TypeError, ValueError):
             return self.async_abort(reason="invalid_discovery")
+        if is_known_connection((entry.data for entry in self._async_current_entries()), data):
+            # The app re-announces itself on every start; do not leave a second card behind.
+            return self.async_abort(reason="already_configured")
         self._discovered = data
         self.context["title_placeholders"] = {"name": "Famalio Home"}
         return await self.async_step_hassio_confirm()

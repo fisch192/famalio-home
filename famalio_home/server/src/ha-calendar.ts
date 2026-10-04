@@ -19,7 +19,7 @@ const MAX_PENDING_REQUESTS = 5;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 type Projection = 'full' | 'busy';
 type Access = 'read' | 'write';
-type GrantInput = { label: string; projection: Projection; maxDays: number; calendarNames: string[]; access: Access };
+type GrantInput = { label: string; projection: Projection; maxDays: number; calendarNames: string[]; access: Access; includeRestricted: boolean };
 type CalendarRow = { id: string; name: string; color: string | null };
 type Parts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
@@ -215,13 +215,15 @@ function grantInput(body: Record<string, unknown>): GrantInput {
   const maxDays = body.max_days;
   const calendarNames = body.calendar_ids;
   const access = body.access ?? 'read';
+  // Opt-in to parents-only and group events: explicit boolean only, never inferred from other values.
+  const includeRestricted = 'include_restricted' in body ? body.include_restricted : false;
   if (!label || label.length > 80 || (projection !== 'full' && projection !== 'busy')
-    || (access !== 'read' && access !== 'write') || (access === 'write' && projection !== 'full')
+    || typeof includeRestricted !== 'boolean' || (access !== 'read' && access !== 'write') || (access === 'write' && projection !== 'full')
     || !Number.isInteger(maxDays) || (maxDays as number) < 1 || (maxDays as number) > MAX_GRANT_DAYS
     || !Array.isArray(calendarNames) || calendarNames.length < 1 || calendarNames.length > MAX_GRANT_CALENDARS
     || new Set(calendarNames).size !== calendarNames.length
     || !calendarNames.every((name) => typeof name === 'string' && (name === FAMILY_CALENDAR || /^calendar-[0-9a-f-]{36}$/i.test(name)))) throw invalidInput();
-  return { label, projection, maxDays: maxDays as number, calendarNames: calendarNames as string[], access };
+  return { label, projection, maxDays: maxDays as number, calendarNames: calendarNames as string[], access, includeRestricted };
 }
 
 function requestCode(): string {
@@ -290,7 +292,7 @@ export class HomeAssistantCalendar {
       await this.auth.consumeConfirmation(tx, principal, body.confirmation_token, 'ha_grant_create');
       const id = await this.insertGrant(tx, principal, input, hashSecret(token));
       return { integration_id: id, label: input.label, projection: input.projection, max_days: input.maxDays,
-        calendar_ids: input.calendarNames, access: input.access, integration_token: token };
+        calendar_ids: input.calendarNames, access: input.access, include_restricted: input.includeRestricted, integration_token: token };
     });
   }
 
@@ -303,19 +305,20 @@ export class HomeAssistantCalendar {
     if (!instance.rows[0]) throw new ApiError(503, 'UNAVAILABLE', 'Instance not initialised');
     const id = randomUUID();
     await tx.query(
-      `insert into famalio.ha_integrations(id,family_id,created_by_subject_id,recovery_epoch,label,projection,max_days,calendar_names,token_hash,access)
-       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [id, principal.familyId, principal.subjectId, instance.rows[0].recovery_epoch, input.label, input.projection, input.maxDays, input.calendarNames, tokenHash, input.access]);
+      `insert into famalio.ha_integrations(id,family_id,created_by_subject_id,recovery_epoch,label,projection,max_days,calendar_names,token_hash,access,include_restricted)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [id, principal.familyId, principal.subjectId, instance.rows[0].recovery_epoch, input.label, input.projection, input.maxDays, input.calendarNames, tokenHash, input.access, input.includeRestricted]);
     await this.audit(tx, principal, input.access === 'write' ? 'ha_grant.created_write' : 'ha_grant.created');
+    if (input.includeRestricted) await this.audit(tx, principal, 'ha_grant.restricted_events_enabled');
     return id;
   }
 
   async list(principal: Principal) {
     if (principal.role !== 'owner') throw accessDenied();
     const { rows } = await this.db.query(
-      'select id,label,projection,max_days,calendar_names,access,created_at,revoked_at from famalio.ha_integrations where family_id=$1 order by created_at', [principal.familyId]);
+      'select id,label,projection,max_days,calendar_names,access,include_restricted,created_at,revoked_at from famalio.ha_integrations where family_id=$1 order by created_at', [principal.familyId]);
     return { integrations: rows.map((row) => ({ integration_id: row.id, label: row.label, projection: row.projection,
-      max_days: row.max_days, calendar_ids: row.calendar_names, access: row.access, created_at: new Date(row.created_at).toISOString(),
+      max_days: row.max_days, calendar_ids: row.calendar_names, access: row.access, include_restricted: row.include_restricted, created_at: new Date(row.created_at).toISOString(),
       revoked: row.revoked_at !== null })) };
   }
 
@@ -382,7 +385,7 @@ export class HomeAssistantCalendar {
       const integrationId = await this.insertGrant(tx, principal, { ...input, label: body.label === undefined ? rows[0].label : input.label }, randomBytes(32));
       await tx.query("update famalio.ha_connection_requests set state='approved', family_id=$2, integration_id=$3 where id=$1",
         [requestId, principal.familyId, integrationId]);
-      return { request_id: requestId, integration_id: integrationId, state: 'approved', access: input.access };
+      return { request_id: requestId, integration_id: integrationId, state: 'approved', access: input.access, include_restricted: input.includeRestricted };
     });
   }
 
@@ -424,7 +427,7 @@ export class HomeAssistantCalendar {
     const instance = await this.db.query('select instance_id, recovery_epoch from famalio.instance');
     return { instance_id: instance.rows[0]?.instance_id, recovery_epoch: instance.rows[0]?.recovery_epoch,
       family_id: grant.family_id, integration_id: grant.id,
-      projection: grant.projection, max_days: grant.max_days, access: grant.access,
+      projection: grant.projection, max_days: grant.max_days, access: grant.access, include_restricted: grant.include_restricted,
       calendars: available.filter((calendar) => active.calendar_names.includes(calendar.id))
         .map((calendar) => ({ calendar_id: calendar.id, name: calendar.name, color: calendar.color })) };
   }
@@ -442,11 +445,12 @@ export class HomeAssistantCalendar {
       || start.getTime() < now - maxRange || end.getTime() > now + maxRange) throw invalidInput('Requested interval exceeds this integration grant');
     const calendarName = calendarId === FAMILY_CALENDAR ? null : calendarId;
     const { rows } = await this.db.query(
-      // SEC-07: parents-only and closed-group events are never projected; HA is not a family member.
+      // SEC-07: parents-only and closed-group events are projected only to grants the owner explicitly opted in
+      // (include_restricted, default off); HA is not a family member.
       `select name,fields from famalio.records where family_id=$1 and type='FC_Event' and not deleted
-         and visibility <> 'parentsOnly' and audience_group is null
+         and ($4::boolean or (visibility <> 'parentsOnly' and audience_group is null))
          and calendar_name is not distinct from $2 order by revision limit $3`,
-      [active.family_id, calendarName, MAX_CALENDAR_ROWS + 1]);
+      [active.family_id, calendarName, MAX_CALENDAR_ROWS + 1, active.include_restricted === true]);
     if (rows.length > MAX_CALENDAR_ROWS) throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Too many events in this calendar to project safely');
     const events: any[] = [];
     for (const row of rows) {
@@ -549,7 +553,7 @@ export class HomeAssistantCalendar {
     const token = parseSecret(request.headers.authorization?.replace(/^Bearer /, ''), 'fhi');
     if (!token) throw authRequired();
     const { rows } = await this.db.query(
-      `select h.id,h.family_id,h.created_by_subject_id,h.projection,h.max_days,h.calendar_names,h.access
+      `select h.id,h.family_id,h.created_by_subject_id,h.projection,h.max_days,h.calendar_names,h.access,h.include_restricted
          from famalio.ha_integrations h join famalio.subjects s on s.id=h.created_by_subject_id and s.family_id=h.family_id
          join famalio.families f on f.id=h.family_id join famalio.instance i on i.recovery_epoch=h.recovery_epoch
         where h.token_hash=$1 and h.revoked_at is null and s.role='owner' and s.removed_at is null and f.placement_state='active'`,
