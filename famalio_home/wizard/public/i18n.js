@@ -219,6 +219,81 @@ export const PATTERNS = [
   [/^(.+) auswählen …$/, (k) => `Choose ${(EN[k] ?? k).toLowerCase()} …`],
 ];
 
+/** Messages the add-on server sends in English; the German page shows these translated. */
+export const SERVER_DE = {
+  "Sign in to Tailscale to continue.": "Melde dich bei Tailscale an, um fortzufahren.",
+  "Tailscale is connected; enable HTTPS for this tailnet, then check again.": "Tailscale ist verbunden. Aktiviere HTTPS für dein Tailnet und prüfe dann erneut.",
+  "Waiting for a valid HTTPS certificate and verified internal endpoint.": "Warte auf ein gültiges HTTPS-Zertifikat und die geprüfte interne Verbindung.",
+  "Waiting for Tailscale HTTPS.": "Warte auf Tailscale-HTTPS.",
+  "Home Assistant discovery request accepted.": "Die Home-Assistant-Anfrage wurde angenommen.",
+  "Approve this code in the Famalio app.": "Bestätige diesen Code in der Famalio-App.",
+  "The request expired. Start a new one.": "Die Anfrage ist abgelaufen. Sende eine neue Anfrage.",
+  "The request was declined in the app.": "Die Anfrage wurde in der App abgelehnt.",
+  "The approved connection could not be picked up.": "Die bestätigte Verbindung konnte nicht übernommen werden.",
+  "Home Assistant could not be connected.": "Home Assistant konnte nicht verbunden werden.",
+  "Not found.": "Nicht gefunden.",
+  "Supervisor ingress only.": "Nur über die Home-Assistant-Oberfläche erreichbar.",
+  "Invalid request origin.": "Ungültiger Anfrage-Ursprung.",
+  "CSRF validation failed.": "Sicherheitsprüfung fehlgeschlagen. Lade die Seite neu.",
+  "JSON content type required.": "Ungültiges Anfrageformat.",
+  "Internal setup error.": "Interner Fehler bei der Einrichtung.",
+  "Invalid request.": "Ungültige Anfrage.",
+  "Invalid JSON": "Ungültige Anfrage.",
+  "Request too large": "Die Anfrage ist zu groß.",
+  "Response too large": "Die Antwort ist zu groß.",
+  "Upstream response too large": "Die Antwort des Servers ist zu groß.",
+  "Redirect rejected": "Eine Weiterleitung wurde aus Sicherheitsgründen abgelehnt.",
+  "Home Assistant discovery redirect rejected.": "Eine Weiterleitung wurde aus Sicherheitsgründen abgelehnt.",
+  "Setup action failed.": "Die Einrichtungsaktion ist fehlgeschlagen.",
+  "Enter an HTTPS origin without a path, query, or fragment.": "Gib eine HTTPS-Adresse ohne Pfad ein, z. B. https://name.tailnet.ts.net.",
+  "Enter an HTTPS origin without path, query, or fragment.": "Gib eine HTTPS-Adresse ohne Pfad ein, z. B. https://name.tailnet.ts.net.",
+  "Choose a supported network mode.": "Wähle eine unterstützte Zugangsart.",
+  "Choose a valid network option first.": "Wähle zuerst einen gültigen Zugang.",
+  "Create your Famalio Home family in the app first.": "Lege zuerst deine Famalio-Home-Familie in der App an.",
+  "Finish the network step first.": "Schließe zuerst Schritt 1 (Zugang) ab.",
+  "Select Tailscale first.": "Wähle zuerst Tailscale.",
+  "Verify the HTTPS server identity before discovery.": "Prüfe zuerst die HTTPS-Serveridentität.",
+  "Provide an app-created fhi_ integration grant.": "Gib einen in der App erzeugten Integrationstoken (fhi_) ein.",
+  "HTTPS verification timed out": "Die HTTPS-Prüfung hat zu lange gedauert.",
+  "Invalid HTTPS verification response": "Ungültige Antwort bei der HTTPS-Prüfung.",
+  "Tailscale certificate request timed out.": "Die Tailscale-Zertifikatsanfrage hat zu lange gedauert.",
+  "Tailscale HTTPS certificate could not be issued.": "Das Tailscale-HTTPS-Zertifikat konnte nicht ausgestellt werden.",
+  "Tailscale certificate identity or validity is invalid.": "Das Tailscale-Zertifikat ist ungültig oder läuft bald ab.",
+  "Tailscale DNS name is invalid.": "Der Tailscale-Name ist ungültig.",
+  "Tailscale HTTPS is not ready.": "Tailscale-HTTPS ist noch nicht bereit.",
+  "Tailscale HTTPS identity is unavailable.": "Die Tailscale-HTTPS-Identität ist nicht verfügbar.",
+  "Local server identity is unavailable.": "Die Identität des lokalen Servers ist nicht verfügbar.",
+  "Unexpected TLS server name.": "Unerwarteter Servername im Zertifikat.",
+  "Unexpected add-on identity.": "Unerwartete Add-on-Identität.",
+  "Home Assistant add-on identity could not be verified.": "Die Identität des Famalio-Add-ons konnte nicht geprüft werden.",
+  "Home Assistant discovery is unavailable in this add-on runtime.": "Die Home-Assistant-Erkennung ist in dieser Umgebung nicht verfügbar.",
+  "The HTTPS address points to a different Famalio instance.": "Die HTTPS-Adresse gehört zu einer anderen Famalio-Instanz.",
+  "The HTTPS endpoint identifies a different server.": "Die HTTPS-Adresse gehört zu einem anderen Server.",
+  "The HTTPS endpoint points to a different Famalio server.": "Die HTTPS-Adresse gehört zu einem anderen Famalio-Server.",
+};
+
+const SERVER_PATTERNS_DE = [
+  [/^HTTPS verification returned (\d+)$/, (n) => `Die HTTPS-Prüfung antwortete mit Fehler ${n}.`],
+  [/^Home Assistant discovery returned (\d+)\.$/, (n) => `Home Assistant antwortete mit Fehler ${n}.`],
+  [/^Upstream returned (\d+)$/, (n) => `Der Server antwortete mit Fehler ${n}.`],
+];
+
+/** German text for a known English server message; anything else is returned unchanged. */
+export function fromServer(text) {
+  if (typeof text !== "string") return text;
+  const core = text.trim();
+  if (!core) return text;
+  const lead = text.match(/^\s*/)[0];
+  const trail = text.match(/\s*$/)[0];
+  const direct = SERVER_DE[core];
+  if (direct !== undefined) return lead + direct + trail;
+  for (const [pattern, build] of SERVER_PATTERNS_DE) {
+    const match = core.match(pattern);
+    if (match) return lead + build(...match.slice(1)) + trail;
+  }
+  return text;
+}
+
 const STORAGE_KEY = "famalio.panel.lang";
 
 export function currentLanguage(search = globalThis.location?.search ?? "", stored = null, browser = globalThis.navigator?.language ?? "de") {
@@ -254,7 +329,7 @@ export function install(documentRef = document, lang = currentLanguage(undefined
     const current = node.nodeValue;
     if (original && current !== original.shown) originals.delete(node); // the page wrote new text
     const source = originals.has(node) ? originals.get(node).source : current;
-    const shown = language === "en" ? translate(source, "en") : source;
+    const shown = language === "en" ? translate(source, "en") : fromServer(source);
     if (shown !== current) node.nodeValue = shown;
     originals.set(node, { source, shown });
   };
@@ -266,7 +341,7 @@ export function install(documentRef = document, lang = currentLanguage(undefined
       const stored = element[key];
       if (stored && stored.shown !== current) element[key] = undefined;
       const source = element[key]?.source ?? current;
-      const shown = language === "en" ? translate(source, "en") : source;
+      const shown = language === "en" ? translate(source, "en") : fromServer(source);
       if (shown !== current) element.setAttribute(name, shown);
       element[key] = { source, shown };
     }

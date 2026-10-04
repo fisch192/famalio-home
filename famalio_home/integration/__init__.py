@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import FamalioApi, FamalioApiError, FamalioAuthError
 from .const import CONF_ADDON_SLUG, CONF_INTERNAL_URL, CONF_FAMILY_ID, CONF_INSTANCE_ID, CONF_INTEGRATION_ID, CONF_MAX_DAYS, CONF_PROJECTION, CONF_RECOVERY_EPOCH, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
+from .events import poll_window
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,9 +53,7 @@ class FamalioCalendarCoordinator(DataUpdateCoordinator[dict]):
                 raise UpdateFailed("Famalio Home returned invalid calendars")
             max_days = int(metadata.get("max_days", self.entry.data[CONF_MAX_DAYS]))
             now = dt_util.now()
-            past_days = min(2, max_days // 4)
-            start = now - timedelta(days=past_days)
-            end = now + timedelta(days=max_days - past_days)
+            start, end = poll_window(now, max_days)
             events: dict[str, list[dict]] = {}
             for calendar in calendars:
                 calendar_id = calendar.get("calendar_id")

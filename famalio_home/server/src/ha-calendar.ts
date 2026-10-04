@@ -442,7 +442,9 @@ export class HomeAssistantCalendar {
       || start.getTime() < now - maxRange || end.getTime() > now + maxRange) throw invalidInput('Requested interval exceeds this integration grant');
     const calendarName = calendarId === FAMILY_CALENDAR ? null : calendarId;
     const { rows } = await this.db.query(
+      // SEC-07: parents-only and closed-group events are never projected; HA is not a family member.
       `select name,fields from famalio.records where family_id=$1 and type='FC_Event' and not deleted
+         and visibility <> 'parentsOnly' and audience_group is null
          and calendar_name is not distinct from $2 order by revision limit $3`,
       [active.family_id, calendarName, MAX_CALENDAR_ROWS + 1]);
     if (rows.length > MAX_CALENDAR_ROWS) throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Too many events in this calendar to project safely');
@@ -521,6 +523,7 @@ export class HomeAssistantCalendar {
     if (!/^event-[0-9a-f-]{36}$/.test(uid)) throw notFound();
     const { rows } = await this.db.query(
       `select fields, revision from famalio.records where family_id=$1 and name=$2 and type='FC_Event' and not deleted
+         and visibility <> 'parentsOnly' and audience_group is null
          and calendar_name is not distinct from $3`, [grant.family_id, uid, calendarId === FAMILY_CALENDAR ? null : calendarId]);
     if (!rows[0]) throw notFound();
     const payload = decodePayload(rows[0].fields);
