@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.7
 
 - Bundled dashboard calendar card with visual editor, independent calendar selections,
   month/week/day/agenda views, and family, wall-display and school presets.

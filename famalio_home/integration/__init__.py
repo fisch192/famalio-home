@@ -30,7 +30,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     await hass.http.async_register_static_paths([
         StaticPathConfig("/famalio/famalio-calendar-card.js", str(card_path), False),
     ])
-    frontend.add_extra_js_url(hass, "/famalio/famalio-calendar-card.js?v=0.5.6")
+    frontend.add_extra_js_url(hass, "/famalio/famalio-calendar-card.js?v=0.5.7")
     return True
 
 

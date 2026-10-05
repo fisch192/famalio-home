@@ -24,14 +24,14 @@ there, and you can build automations ("when the school day starts, turn on the h
 
 Deutsche Anleitung: [docs/INSTALL.de.md](docs/INSTALL.de.md)
 
-> **Status: experimental, version 0.4.0.** Verified so far: the amd64 Home Assistant add-on builds
-> and runs on Home Assistant OS (database, migrations, owner setup, pairing, calendar
-> create/read/update/delete, scoped HA reads, restart persistence, cold backup). The Linux
-> installer is tested automatically on every change. **Not yet verified on real hardware:** the
-> new one-click integration install and the Home Assistant restart button of version 0.4.0, the
-> `aarch64` build, restoring a Home Assistant backup, a real Tailscale login with the installer.
-> Report problems in the [issue tracker](https://github.com/fisch192/famalio-home/issues). Keep
-> using Famalio's normal sync as well; do not make this your only copy.
+> **Version 0.5.7.** The amd64 Home Assistant add-on has been verified on Home Assistant OS
+> (database, migrations, owner setup, pairing, calendar create/read/update/delete, scoped HA
+> reads, restart persistence and cold backup). Calendar automation rules and dashboard cards
+> were also tested live on a Home Assistant 2026.9.4 VM. The Linux installer is tested in CI.
+> The `aarch64` build, restoring a Home Assistant backup and a real Tailscale login with the
+> installer still need verification. Report problems in the
+> [issue tracker](https://github.com/fisch192/famalio-home/issues). Keep using Famalio's normal
+> sync as well; do not make this your only copy.
 
 ## Contents
 
