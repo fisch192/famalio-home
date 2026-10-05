@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { EN, translate, currentLanguage } from '../../famalio_home/wizard/public/i18n.js';
 
-const read = (name) => readFileSync(new URL(`../public/${name}`, import.meta.url), 'utf8');
+const read = (name) => readFileSync(new URL(`../../famalio_home/wizard/public/${name}`, import.meta.url), 'utf8');
 const GERMAN = /[äöüÄÖÜß]|\b(und|oder|die|der|das|nicht|Bitte|Tippe|wird|ist|Neue|Keine|Alle|Heute|Woche|Monat|Termin|Kalender|Verbindung|Fehler|Warte|Speicher|Bearbeit|Lösch|Schließ|Zugang|Schritt|Einrichtung|Wir|Dein|Deine|Öffne|Famalio-App)\b/;
 const DYNAMIC = /\$\{/;
 

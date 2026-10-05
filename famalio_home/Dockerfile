@@ -99,7 +99,7 @@ EXPOSE 9443/tcp
 # to drop each service to its own account (s6-setuidgid). No service process
 # runs as root: postgres, famalio_owner, famalio_app and famalio_ts only.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-  CMD ["/usr/local/bin/node", "-e", "fetch('http://127.0.0.1:8787/health/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+  CMD ["/usr/bin/curl", "--fail", "--silent", "--show-error", "--output", "/dev/null", "--max-time", "4", "http://127.0.0.1:8787/health/live"]
 
 LABEL io.hass.type="app" \
       io.hass.version="${BUILD_VERSION}" \

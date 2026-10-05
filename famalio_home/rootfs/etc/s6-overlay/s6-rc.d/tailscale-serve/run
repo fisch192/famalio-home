@@ -102,10 +102,14 @@ while :; do
   state="$(ts status --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",x=>s+=x).on("end",()=>{try{const x=JSON.parse(s);process.stdout.write(x.BackendState||"Unknown")}catch{process.stdout.write("Unknown")}})' 2>/dev/null || echo Unknown)"
   if [ "$state" = Running ]; then
     tmp="$TS_RUN_DIR/serve-output"
-    if ! serve_is_safe; then
-      if bounded_ts serve --bg --https=443 "http://127.0.0.1:${FAMALIO_PORT:-8787}" >"$tmp" 2>&1; then :; fi
-    fi
+    serve_safe=false
     if serve_is_safe; then
+      serve_safe=true
+    else
+      if bounded_ts serve --bg --https=443 "http://127.0.0.1:${FAMALIO_PORT:-8787}" >"$tmp" 2>&1; then :; fi
+      if serve_is_safe; then serve_safe=true; fi
+    fi
+    if [ "$serve_safe" = true ]; then
       serve_state=active
       https_ready=true
     else
@@ -124,5 +128,7 @@ while :; do
     https_ready=false
   fi
   write_status "${serve_state:-waiting_for_login}" "${https_ready:-false}" || true
-  sleep 10
+  # Healthy state needs only occasional drift checks. Keep setup and failure
+  # recovery responsive without repeatedly spawning Node and Tailscale at idle.
+  if [ "${serve_state:-}" = active ]; then sleep 60; else sleep 10; fi
 done

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Reduced idle CPU usage in the Home Assistant add-on: setup configuration is
+  validated only when the file changes, instead of starting Node every two seconds.
+- Healthy Tailscale checks run once per minute and validate Serve only once per
+  cycle. Login and HTTPS failures still retry every ten seconds.
+- The container health probe uses curl instead of starting another Node runtime.
+
 ## 0.5.3
 
 - **Open in the Famalio app.** On your phone, step 2 of the setup panel now has an **Open in the Famalio app**

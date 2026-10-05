@@ -25,10 +25,19 @@ read_valid_config() {
   ' "$FAMALIO_SETUP_CONFIG" 2>/dev/null
 }
 
+# The wizard replaces config.json atomically. Only start Node when its metadata
+# changes; inode plus nanosecond mtime/ctime also detect same-size in-place edits.
+checked_fingerprint=""
+generation=""
 while :; do
-  if generation="$(read_valid_config 2>/dev/null)" && [ -n "$generation" ]; then
+  fingerprint="$(stat -c '%i:%s:%y:%z' "$FAMALIO_SETUP_CONFIG" 2>/dev/null || true)"
+  if [ "$fingerprint" != "$checked_fingerprint" ]; then
+    checked_fingerprint="$fingerprint"
+    generation="$(read_valid_config 2>/dev/null)" || generation=""
+  fi
+  if [ -n "$generation" ]; then
     previous=""
-    [ ! -r "$applied" ] || previous="$(cat "$applied" 2>/dev/null || true)"
+    if [ -r "$applied" ]; then IFS= read -r previous <"$applied" || true; fi
     if [ "$generation" != "$previous" ]; then
       echo "[famalio] applying setup generation (service restart)"
       s6-svc -r /run/service/famalio-server
