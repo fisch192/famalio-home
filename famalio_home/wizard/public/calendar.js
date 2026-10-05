@@ -36,7 +36,7 @@ const PALETTE = ["#5b56c8", "#1f8a70", "#d9544f", "#e08a1e", "#2b7bd6", "#a14fb0
 const VIEWS = [["month", "Monat"], ["week", "Woche"], ["day", "Tag"], ["agenda", "Agenda"]];
 const TIMINGS = [["start", "Zum Beginn"], ["before_start", "Vor Beginn"], ["after_start", "Nach Beginn"], ["end", "Zum Ende"], ["before_end", "Vor Ende"], ["after_end", "Nach Ende"]];
 const HOUR_PX = 44;
-const DOMAIN_LABEL = { scene: "Szene", script: "Skript", light: "Licht", switch: "Schalter", climate: "Thermostat" };
+const DOMAIN_LABEL = { scene: "Szene", script: "Skript", automation: "Automation", light: "Licht", switch: "Schalter", climate: "Thermostat", cover: "Rollladen", media_player: "Medienplayer", fan: "Ventilator", input_boolean: "Helfer" };
 
 const localDayKey = (value, zone) => {
   if (!value) return "";
@@ -71,8 +71,16 @@ const store = {
 const scopeLabel = (rule) => {
   if (!rule) return "Eigene Bedingung";
   if (rule.scope === "calendar") return "Alle Termine";
-  if (rule.scope === "keyword") return `Titel enthält „${rule.keyword || ""}“`;
+  if (["keyword", "description", "location"].includes(rule.scope)) {
+    const label = { keyword: "Titel", description: "Notiz", location: "Ort" }[rule.scope];
+    const mode = { starts_with: "beginnt mit", ends_with: "endet mit", not_contains: "enthält nicht" }[rule.filters?.matchMode] || "enthält";
+    return `${label} ${mode} „${rule.keyword || ""}“`;
+  }
   if (rule.scope === "title") return `Titel „${rule.summary || ""}“`;
+  if (rule.scope === "titles") return (rule.titles || []).join(" / ");
+  if (rule.scope === "all_day") return "Ganztägige Termine";
+  if (rule.scope === "timed") return "Termine mit Uhrzeit";
+  if (rule.scope === "empty_day") return "Tag ohne Termine";
   return "Ein einzelner Termin";
 };
 
@@ -253,6 +261,7 @@ class FamalioCalendar {
   }
 
   async loadAutomations() {
+    this.hass = parent.document.querySelector("home-assistant")?.hass || this.hass;
     const sequence = ++this.automationSequence;
     const candidates = Object.values(this.hass.states || {}).filter((state) => state.entity_id?.startsWith("automation."));
     const results = [];
@@ -476,7 +485,8 @@ class FamalioCalendar {
     if (!this.calendars.length) return;
     const head = node("div", "fx-section-head");
     const manage = node("a", "fx-link", "In Home Assistant verwalten ↗"); manage.href = "/config/automation/dashboard"; manage.target = "_top";
-    head.append(node("h2", "", "Kalender-Automationen"), manage); this.rulesPanel.append(head);
+    const add = button("＋ Automation", "fx-btn"); add.addEventListener("click", () => this.openBuilder());
+    head.append(node("h2", "", "Kalender-Automationen"), add, manage); this.rulesPanel.append(head);
     if (this.automationError) this.rulesPanel.append(node("p", "fx-warning", this.automationError));
     if (!this.automations.length) { this.rulesPanel.append(node("p", "fx-empty", "Noch keine Automationen. Wählen Sie einen Termin und legen Sie fest, was passieren soll.")); return; }
     const list = node("div", "fx-rule-list");
@@ -624,30 +634,59 @@ class FamalioCalendar {
       .map((s) => [s.entity_id, s.attributes?.friendly_name || s.entity_id])
       .sort((a, b) => a[1].localeCompare(b[1]));
   }
-  openBuilder(event) {
+  openBuilder(event = null) {
+    const sourceEvent = event;
+    if (!event) {
+      const calendar = this.calendars[0];
+      if (!calendar) return;
+      event = { entity_id: calendar.id, calendar_name: calendar.name, summary: "", start: this.anchor, all_day: true };
+    }
     this.showDrawer("Neue Automation");
     const calendarName = event.calendar_name || "Kalender";
     const form = document.createElement("form"); form.className = "fx-form";
     form.append(node("p", "fx-hint", `Ausgelöst durch Termine in „${calendarName}“. Home Assistant führt die Aktion aus, auch wenn dieses Fenster geschlossen ist.`));
 
-    // 1 · Which events
-    const scopeBox = node("fieldset", "fx-choices"); scopeBox.append(node("legend", "fx-label", "Für welche Termine?"));
+    const calendar = select(this.calendars.map((c) => [c.id, c.name]), event.entity_id);
+    form.append(field("Kalender", calendar));
+
+    // 1 · Which events, with editable names and reusable shift/day-off presets.
     const firstWord = String(event.summary || "").split(/\s+/).find((w) => w.length > 2) || "";
-    const keyword = input("text", firstWord, { placeholder: "Stichwort", "aria-label": "Stichwort" });
     const choices = [
-      ["occurrence", "Nur dieser Termin", fmt({ day: "numeric", month: "long" }, localDayKey(event.start, this.zone))],
-      ["title", "Gleicher Titel", `Alle „${event.summary || "(ohne Titel)"}“`],
-      ["keyword", "Titel enthält …", null],
-      ["calendar", "Ganzer Kalender", `Jeder Termin in „${calendarName}“`],
+      ...(sourceEvent ? [["occurrence", "Nur dieser Termin"]] : []),
+      ["title", "Gleicher Titel"], ["keyword", "Titel enthält …"], ["titles", "Einer dieser Titel"],
+      ["description", "Notiz enthält …"], ["location", "Ort enthält …"],
+      ["all_day", "Ganztägige Termine"], ["timed", "Termine mit Uhrzeit"],
+      ["calendar", "Ganzer Kalender"], ["empty_day", "Tag ohne Termine"],
     ];
-    for (const [value, label, detail] of choices) {
-      const card = node("label", "fx-choice");
-      const radio = document.createElement("input"); radio.type = "radio"; radio.name = "scope"; radio.value = value; radio.checked = value === "title";
-      const text = node("span", "fx-choice-text"); text.append(node("strong", "", label));
-      if (detail) text.append(node("span", "fx-meta", detail)); else text.append(keyword);
-      card.append(radio, text); scopeBox.append(card);
+    const scope = select(choices, sourceEvent ? "title" : "calendar");
+    const keyword = input("textarea", event.summary || firstWord, { rows: "3", placeholder: "Titel oder Stichwort; mehrere Titel jeweils in einer Zeile" });
+    const keywordField = field("Titel oder Stichwort", keyword);
+    const matchMode = select([["contains", "Enthält"], ["starts_with", "Beginnt mit"], ["ends_with", "Endet mit"], ["not_contains", "Enthält nicht"]], "contains");
+    const matchField = field("Textvergleich", matchMode);
+    const presets = node("div", "fx-presets");
+    for (const [label, value] of [["Freie Tage", ["Frei", "Freier Tag", "Free day", "Day off"]], ["Tagschicht", ["Tagschicht", "Tagdienst", "Day shift"]], ["Frühschicht", ["Frühschicht", "Frühdienst", "Early shift"]], ["Spätschicht", ["Spätschicht", "Spätdienst", "Late shift"]], ["Nachtschicht", ["Nachtschicht", "Nachtdienst", "Night shift"]], ["Urlaub", ["Urlaub", "Holiday", "Vacation"]]]) {
+      const b = button(label, "fx-preset"); b.addEventListener("click", () => { scope.value = "titles"; keyword.value = value.join("\n"); syncScope(); }); presets.append(b);
     }
-    keyword.addEventListener("focus", () => { scopeBox.querySelector('input[value="keyword"]').checked = true; });
+    const scopeBox = node("div", "fx-form"); scopeBox.append(field("Für welche Termine?", scope), keywordField, matchField, presets);
+
+    const filtersBox = node("details", "fx-card fx-filters"); filtersBox.append(node("summary", "fx-label", "Weitere Bedingungen"));
+    const filterFields = node("div", "fx-form");
+    const weekdays = node("div", "fx-presets"); const weekdayInputs = [];
+    for (const [index, label] of ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].entries()) {
+      const check = input("checkbox"); check.value = index; check.className = "";
+      const wrap = node("label", "fx-weekday"); wrap.append(check, node("span", "", label)); weekdays.append(wrap); weekdayInputs.push(check);
+    }
+    const startAfter = input("time"); const startBefore = input("time");
+    const exclude = input("textarea", "", { rows: "2", placeholder: "Je ein Stichwort pro Zeile" });
+    const stateEntity = select([["", "Keine Zustandsbedingung"], ...this.entityOptions()]);
+    const stateValue = input("text", "", { placeholder: "z. B. on, off, home" });
+    const timeFilters = node("div", "fx-pair"); timeFilters.append(field("Beginn ab", startAfter), field("Beginn vor", startBefore));
+    const excludeField = field("Titel ausschließen", exclude);
+    filterFields.append(field("Wochentage", weekdays, "Keine Auswahl bedeutet jeden Tag. Es zählt der Beginn des Termins."), timeFilters, excludeField,
+      field("Nur wenn Entität", stateEntity), field("Diesen Zustand hat", stateValue)); filtersBox.append(filterFields);
+    const readFilters = () => ({ zone: this.zone, weekdays: weekdayInputs.filter((c) => c.checked).map((c) => Number(c.value)),
+      exclude: scope.value === "empty_day" ? "" : exclude.value, startAfter: scope.value === "empty_day" ? "" : startAfter.value,
+      startBefore: scope.value === "empty_day" ? "" : startBefore.value, entity: stateEntity.value, state: stateValue.value, dailyTime: dailyTime.value, matchMode: matchMode.value });
 
     // 2 · When
     const timing = select(TIMINGS, "start");
@@ -655,6 +694,26 @@ class FamalioCalendar {
     const offsetWrap = node("div", "fx-pair"); offsetWrap.append(offset, node("span", "fx-meta", "Minuten"));
     const syncOffset = () => { offsetWrap.hidden = timing.value === "start" || timing.value === "end"; }; timing.addEventListener("change", syncOffset); syncOffset();
     const whenRow = node("div", "fx-pair"); whenRow.append(timing, offsetWrap);
+    const dailyTime = input("time", "07:00");
+    const dailyField = field("Täglich prüfen um", dailyTime, "Prüft den ganzen heutigen Tag im gewählten Kalender, auch über Mitternacht laufende Termine. Ein freier Tag mit einem Termin ist nicht leer.");
+    const whenField = field("Wann?", whenRow);
+    const preview = node("p", "fx-hint"); preview.setAttribute("role", "status");
+    const syncScope = () => {
+      keywordField.hidden = !["title", "keyword", "titles", "description", "location"].includes(scope.value);
+      matchField.hidden = !["keyword", "description", "location"].includes(scope.value);
+      dailyField.hidden = scope.value !== "empty_day"; whenField.hidden = scope.value === "empty_day";
+      timeFilters.hidden = excludeField.hidden = scope.value === "empty_day";
+      if (scope.value === "occurrence") calendar.value = event.entity_id;
+      calendar.disabled = scope.value === "occurrence";
+      try {
+        if (scope.value === "empty_day") { preview.textContent = "Die Aktion läuft nur, wenn der Kalender heute erreichbar und vollständig leer ist."; return; }
+        const candidate = { ...event, entity_id: calendar.value, summary: scope.value === "title" ? keyword.value : event.summary };
+        const config = createCalendarAutomation(candidate, "scene.preview", scope.value, timing.value, offset.value, keyword.value, readFilters());
+        const count = this.events.filter((e) => e.entity_id === calendar.value && ruleMatchesEvent(automationRule(config), e)).length;
+        preview.textContent = `${count} passende Termine im geladenen Zeitraum. Zustandsbedingungen werden bei Ausführung geprüft.`;
+      } catch (error) { preview.textContent = error.message; }
+    };
+    form.addEventListener("input", syncScope); form.addEventListener("change", syncScope);
 
     // 3 · What (any HA action, one or more)
     const actionsBox = node("div", "fx-actions");
@@ -665,7 +724,10 @@ class FamalioCalendar {
     const PRESETS = [
       ["Szene", "scene.turn_on", "scene"], ["Skript", "script.turn_on", "script"], ["Licht an", "light.turn_on", "light"],
       ["Licht aus", "light.turn_off", "light"], ["Schalter", "switch.turn_on", "switch"], ["Klima", "climate.set_temperature", "climate"],
-      ["Mitteilung", "notify.notify", null], ["Beliebig", "", null],
+      ["Mitteilung", "notify.notify", null], ["Automation", "automation.trigger", "automation"],
+      ["Schalter aus", "switch.turn_off", "switch"], ["Rollladen auf", "cover.open_cover", "cover"], ["Rollladen zu", "cover.close_cover", "cover"],
+      ["Musik", "media_player.media_play", "media_player"], ["Pause", "media_player.media_pause", "media_player"],
+      ["Ventilator", "fan.turn_on", "fan"], ["Helfer", "input_boolean.turn_on", "input_boolean"], ["Beliebig", "", null],
     ];
     const addRow = (preset = PRESETS[0]) => {
       const row = node("div", "fx-action-row");
@@ -684,14 +746,22 @@ class FamalioCalendar {
       };
       targetInput.addEventListener("change", () => { const id = targetInput.value.trim(); if (this.hass.states?.[id]) { chosen.add(id); targetInput.value = ""; paintTargets(); } });
       targets.append(targetInput);
-      const data = input("textarea", preset[1] === "notify.notify" ? `message: ${event.summary || "Termin"} beginnt` : "", { rows: "2", spellcheck: "false", placeholder: "Optionale Daten, z. B. brightness_pct: 60" });
+      const data = input("textarea", preset[1] === "notify.notify" ? `message: ${event.summary || "Termin"} beginnt` : preset[1] === "automation.trigger" ? "skip_condition: false" : "", { rows: "2", spellcheck: "false", placeholder: "Optionale Daten, z. B. brightness_pct: 60" });
+      const automationHint = node("p", "fx-hint", "Bei einer bestehenden Automation werden ihre Bedingungen beachtet. Ihre eigenen Auslöser bleiben aktiv; Vorlagen mit ursprünglichen Auslöserdaten brauchen eventuell Anpassung.");
       const applyPreset = (p, b, focus) => {
         presetBar.querySelectorAll(".fx-preset").forEach((x) => x.classList.toggle("active", x === b));
+        if (service.value !== p[1]) { chosen.clear(); targetInput.value = ""; paintTargets(); data.value = ""; }
         service.value = p[1]; if (p[1] === "notify.notify" && !data.value) data.value = `message: ${event.summary || "Termin"} beginnt`;
+        if (p[1] === "automation.trigger" && !data.value) data.value = "skip_condition: false";
+        automationHint.hidden = p[1] !== "automation.trigger";
         const domain = p[2]; targetInput.placeholder = domain ? `${DOMAIN_LABEL[domain]} auswählen …` : "Gerät oder Entität hinzufügen …";
         entityList.replaceChildren(...this.entityOptions(domain).map(([id, label]) => option(id, label)));
         if (focus) service.focus();
       };
+      service.addEventListener("change", () => {
+        entityList.replaceChildren(...this.entityOptions(service.value.split(".")[0] === "notify" ? undefined : service.value.split(".")[0]).map(([id, label]) => option(id, label)));
+        automationHint.hidden = service.value !== "automation.trigger";
+      });
       for (const p of PRESETS) {
         const b = button(p[0], "fx-preset");
         b.addEventListener("click", () => applyPreset(p, b, true));
@@ -699,42 +769,55 @@ class FamalioCalendar {
         if (p === preset) applyPreset(p, b, false);
       }
       const remove = button("Entfernen", "fx-link"); remove.addEventListener("click", () => { rows.splice(rows.indexOf(entry), 1); row.remove(); });
-      row.append(presetBar, field("Aktion", service), field("Ziel", targets, "Leer lassen, wenn die Aktion kein Ziel braucht."), field("Daten", data));
+      row.append(presetBar, field("Aktion", service), field("Ziel", targets, "Leer lassen, wenn die Aktion kein Ziel braucht."), field("Daten", data),
+        automationHint);
       if (rows.length) row.append(remove);
-      const entry = { service, chosen, data, row }; rows.push(entry);
+      const entry = { service, chosen, data, row, targetInput }; rows.push(entry);
       actionsBox.append(row);
     };
     addRow();
-    const more = button("＋ Weitere Aktion", "fx-link"); more.addEventListener("click", () => addRow(PRESETS[7]));
+    const more = button("＋ Weitere Aktion", "fx-link"); more.addEventListener("click", () => addRow(PRESETS.at(-1)));
 
     const name = input("text", "", { maxlength: "120", placeholder: "Wird automatisch benannt" });
-    form.append(scopeBox, field("Wann?", whenRow), node("span", "fx-label", "Was soll passieren?"), actionsBox, more, serviceList, field("Name", name));
+    form.append(scopeBox, filtersBox, whenField, dailyField, preview, node("span", "fx-label", "Was soll passieren?"), actionsBox, more, serviceList, field("Name", name));
     const feedback = node("p", "fx-feedback"); feedback.setAttribute("role", "status");
     const save = button("Automation speichern", "fx-btn fx-primary"); save.type = "submit";
     form.append(save, feedback, node("p", "fx-hint", "Tipp: Neue Termine sollten mehr als 15 Minuten in der Zukunft liegen, damit Home Assistant sie rechtzeitig sieht."));
     form.addEventListener("submit", async (e) => {
       e.preventDefault(); save.disabled = true; feedback.textContent = "Wird gespeichert …";
       try {
-        const scope = form.querySelector('input[name="scope"]:checked')?.value || "title";
-        const actions = rows.map(({ service, chosen, data }) => ({ action: service.value.trim(), target: { entity_id: [...chosen] }, data: parseActionData(data.value) }));
+        const actions = rows.map(({ service, chosen, data, targetInput }) => {
+          const pending = targetInput.value.trim();
+          if (pending) {
+            if (!this.hass.states?.[pending]) throw new Error(`Unbekannte Entität „${pending}“.`);
+            chosen.add(pending); targetInput.value = "";
+          }
+          return { action: service.value.trim(), target: { entity_id: [...chosen] }, data: parseActionData(data.value) };
+        });
         for (const action of actions) {
           const [domain, svc] = action.action.split(".");
           if (!this.hass.services?.[domain]?.[svc]) throw new Error(`Unbekannte Aktion „${action.action || "…"}“.`);
+          if (DOMAIN_LABEL[domain] && !action.target.entity_id.length && !action.data.entity_id) throw new Error("Bitte ein Ziel auswählen.");
         }
-        const config = createCalendarAutomation(event, actions, scope, timing.value, Number(offset.value), keyword.value);
+        const candidate = { ...event, entity_id: calendar.value, calendar_name: this.calendars.find((c) => c.id === calendar.value)?.name,
+          summary: scope.value === "title" ? keyword.value : event.summary };
+        if (scope.value === "title" && !candidate.summary.trim()) throw new Error("Bitte einen Titel eingeben.");
+        if (scope.value === "empty_day" && !this.hass.services?.calendar?.get_events) throw new Error("Kalenderabfragen sind nicht verfügbar.");
+        const config = createCalendarAutomation(candidate, actions, scope.value, timing.value, Number(offset.value), keyword.value, readFilters());
         if (name.value.trim()) config.alias = name.value.trim();
         const id = randomId();
         await this.hass.callApi("POST", `config/automation/config/${id}`, config);
-        feedback.textContent = "Gespeichert. Home Assistant übernimmt ab jetzt.";
         await this.loadAutomations();
+        const active = this.automations.find((rule) => rule.id === id && rule.state === "on");
+        feedback.textContent = active ? "Gespeichert. Home Assistant übernimmt ab jetzt." : "Gespeichert. Aktivierung noch nicht bestätigt. Bitte in Home Assistant prüfen.";
         if (!this.automations.some((rule) => rule.id === id)) {
-          this.automations.push({ id, name: config.alias, state: "saved", calendarIDs: [event.entity_id], rule: automationRule(config) });
+          this.automations.push({ id, name: config.alias, state: "saved", calendarIDs: [calendar.value], rule: automationRule(config), actions: config.actions });
           this.paint();
         }
-        setTimeout(() => this.openEvent(event), 700);
+        if (sourceEvent && active) setTimeout(() => this.openEvent(event), 700);
       } catch (error) { feedback.textContent = error?.message || "Speichern fehlgeschlagen. Prüfen Sie Ihre Home Assistant Berechtigungen."; save.disabled = false; }
     });
-    this.drawer.append(form);
+    syncScope(); this.drawer.append(form);
   }
 }
 

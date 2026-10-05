@@ -211,10 +211,91 @@ approve the device request with **Allow editing**, then tap **Check approval** o
 create events (**Neuer Termin** or double-click a slot), change (**Bearbeiten**) or delete
 (**Löschen**) them. Repeating and imported events stay editable only in the app.
 
-**Automations.** Select an event → **＋ Automation**. Pick the scope (this occurrence, exact title,
-title contains a word, whole calendar), timing (start or end, with offset) and one or more Home
-Assistant actions (scenes, scripts, lights, notify, ...). Rules run in Home Assistant's scheduler and
-are listed in its automation editor. Saving never runs the action immediately.
+**Automations.** Select an event → **＋ Automation**, or use **＋ Automation** in the calendar's
+automation list. Select a calendar and choose this occurrence, an exact title, a list of titles,
+title/note/location text, all-day events, timed events, or the whole calendar. Text can contain,
+start with, end with, or exclude a keyword. Editable presets cover days off, day/early/late/night
+shifts and holidays. For example, **Tagschicht** matches `Tagschicht`, `Tagdienst` and `Day shift`;
+edit the list to match your event names.
+
+Under **Weitere Bedingungen**, restrict weekdays, event start times (including overnight windows),
+excluded title keywords, or an entity's state. Weekdays and start times refer to the event's start
+in Home Assistant's timezone, even when the action runs before or after it. The preview counts
+matching events in the loaded calendar range; entity states are checked when the action runs.
+
+Choose start/end timing and optional offsets, then one or more actions: scenes, scripts, lights,
+switches, climate, notifications, covers, media, fans, helpers, or any registered Home Assistant
+action. **Automation** lets you choose an existing automation. Its conditions are respected by
+default and its original triggers remain active. Templates expecting its original trigger data
+may need adjustment. Rules run in Home Assistant's scheduler and appear in its automation editor.
+Saving does not execute the actions. The panel distinguishes saved rules from confirmed active rules.
+
+**Days with no events.** Select **Tag ohne Termine** and a daily check time. Home Assistant queries
+the whole local day in the selected calendar, including events spanning midnight, and runs the
+actions only when that calendar is available and the result is empty. This differs from the
+**Freie Tage** preset, which matches events named `Frei`, `Freier Tag`, `Free day` or `Day off`.
+
+### Calendar on your own dashboard
+
+After updating the integration and restarting Home Assistant, refresh your browser.
+In any editable dashboard choose **Edit dashboard → Add card → Famalio Calendar**.
+The card is bundled with the integration (including HACS installs) and loads automatically;
+no iframe or extra download is needed. You can also use Home Assistant's built-in Calendar
+card with the same calendar entities.
+
+Each Famalio card has independent visual settings. Select one or more calendars, then choose
+**Family calendar**, **Wall display** or **School calendar** as a starting layout. Customize
+month/week/day/agenda, visible weekdays, agenda length, text size, clock, colors, event details
+and navigation. The school preset uses a seven-day agenda and weekdays; the wall preset uses
+a week view and large text. Both follow Home Assistant's time zone and refresh automatically.
+
+Create your own dashboard under **Settings → Dashboards → Add dashboard** (choose a new,
+user-managed dashboard), add the card, and arrange other cards around it. For a calendar-only
+wall page, use a **Panel** view with this single card. Set that dashboard as the display's default
+in its Home Assistant profile. You can put several cards on one page, such as a family month
+calendar beside a child's school agenda.
+
+Example card for a wall display (replace the entity with yours):
+
+```yaml
+type: custom:famalio-calendar-card
+preset: wall
+entities:
+  - calendar.famalio_home_family
+title: Family wall calendar
+show_navigation: false
+max_events: 8
+```
+
+Example for a child's school calendar:
+
+```yaml
+type: custom:famalio-calendar-card
+preset: school
+entities:
+  - calendar.school
+title: Emma · School
+show_location: true
+show_description: false
+```
+
+If school events share a family calendar, select that entity and optionally set **Include text**
+to `Schule, School, Scuola` or the child's name. Matching is case-insensitive; any included term
+matches, while any excluded term hides the event. Search the title alone or title/notes/location.
+A separate school calendar gives the clearest selection. The card also supports other Home
+Assistant calendar integrations. Click an event for its dates, calendar, location and notes;
+event editing and automation creation remain available in the Famalio panel.
+
+These display filters do not change Home Assistant permissions or redact calendar API responses.
+Famalio's connection grant controls which calendars the integration exposes; hidden event details
+are presentation settings.
+
+**Deutsch:** In einem bearbeitbaren Dashboard **Dashboard bearbeiten → Karte hinzufügen →
+Famalio Calendar** wählen. Kalender und Vorlage **Wanddisplay** oder **Schulkalender** auswählen,
+danach Ansicht, Wochentage, Textgröße und Filter anpassen. Für einen eigenen Wandkalender eine
+neue Ansicht vom Typ **Panel** mit genau einer Kalenderkarte anlegen. Der Schulkalender zeigt
+standardmäßig eine Agenda ohne Wochenenden; ein eigener Schulkalender oder passende Textfilter
+bestimmt, welche Termine angezeigt werden.
 
 ### Backups and restore
 
