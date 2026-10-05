@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Bundled dashboard calendar card with visual editor, independent calendar selections,
+  month/week/day/agenda views, and family, wall-display and school presets.
+- Configure text filters, weekdays, text size, clock, colors and details on any dashboard.
+  Dashboard cards use native Home Assistant calendar access and timezone-aware date ranges.
+
+- Calendar automation rules now support editable shift/day-off title lists,
+  note/location text comparisons, all-day or timed events, weekdays, start-time
+  windows, title exclusions, and entity-state conditions, with a matching-event preview.
+- Add a daily whole-day empty-calendar rule, distinct from named day-off events.
+- Choose existing automations directly from an event, with their conditions respected
+  by default. Added covers, media, fans, helpers and switch-off action shortcuts.
+- Typed targets are included when saving. Switching action presets clears stale
+  targets/data, and saving distinguishes stored rules from confirmed active rules.
+
 ## 0.5.6
 
 - Reuse verified HTTPS certificate contexts while certificate files are unchanged.
