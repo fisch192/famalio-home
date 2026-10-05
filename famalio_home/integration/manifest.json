@@ -12,5 +12,8 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/fisch192/famalio-home/issues",
   "requirements": [],
-  "version": "0.5.5"
+  "version": "0.5.7",
+  "dependencies": [
+    "frontend"
+  ]
 }

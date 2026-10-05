@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
+from pathlib import Path
 
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, CONF_URL
 from homeassistant.core import HomeAssistant
@@ -19,6 +22,16 @@ from .events import poll_window
 _LOGGER = logging.getLogger(__name__)
 
 type FamalioConfigEntry = ConfigEntry
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Expose the bundled dashboard card for all Famalio installations."""
+    card_path = Path(__file__).parent / "frontend" / "famalio-calendar-card.js"
+    await hass.http.async_register_static_paths([
+        StaticPathConfig("/famalio/famalio-calendar-card.js", str(card_path), False),
+    ])
+    frontend.add_extra_js_url(hass, "/famalio/famalio-calendar-card.js?v=0.5.7")
+    return True
 
 
 class FamalioCalendarCoordinator(DataUpdateCoordinator[dict]):
