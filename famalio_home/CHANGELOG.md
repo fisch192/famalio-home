@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.5.6
 
+- Reuse verified HTTPS certificate contexts while certificate files are unchanged.
+  Certificate failures back off for one minute; a still-valid certificate remains
+  usable during renewal failures. Cached certificates within the renewal window
+  are checked for renewal at most once per hour.
+- Bound Tailscale status calls so an unresponsive daemon cannot stall its controller.
 - Reduced idle CPU usage in the Home Assistant add-on: setup configuration is
   validated only when the file changes, instead of starting Node every two seconds.
 - Healthy Tailscale checks run once per minute and validate Serve only once per

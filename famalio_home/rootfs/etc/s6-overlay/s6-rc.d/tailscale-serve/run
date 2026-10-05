@@ -8,7 +8,7 @@ set -euo pipefail
 if [ "$(remote_access_mode)" != tailscale ]; then
   exec "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" sleep infinity
 fi
-ts() { "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" "$TAILSCALE_BIN" --socket="$TS_SOCKET" "$@"; }
+ts() { bounded_ts "$@"; }
 bounded_ts() { "$FAMALIO_SETUIDGID" "$FAMALIO_TS_USER" timeout --signal=TERM --kill-after=2s 10s "$TAILSCALE_BIN" --socket="$TS_SOCKET" "$@"; }
 
 serve_is_safe() {
