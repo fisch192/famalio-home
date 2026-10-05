@@ -186,13 +186,14 @@ opt_str() { echo ''; }
     def tailscale(self, **state):
         self.ts_state.write_text(json.dumps(dict(backend='Running', safe=True, repair=True, funnel=False) | state))
         self.tool('tailscale', '''#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, time
 from pathlib import Path
 file = Path(os.environ['TS_STATE'])
 state = json.loads(file.read_text())
 args = sys.argv[2:]
 with open(os.environ['TS_CALLS'], 'a') as log: log.write(' '.join(args) + '\\n')
 if args == ['status', '--json']:
+    if state.get('stall_status'): time.sleep(60)
     print(json.dumps({'BackendState': state['backend'], 'Self': {'DNSName': 'famalio.example.ts.net.'}}))
 elif args == ['serve', 'status', '--json']:
     result = {'Web': {'famalio.example.ts.net:443': {'Handlers': {'/': {'Proxy': 'http://127.0.0.1:8787'}}}}} if state['safe'] else {}
@@ -249,6 +250,23 @@ elif args[:2] == ['serve', '--bg']:
         self.assertEqual(controller.tick(False), 10)
         self.assertEqual(self.status()['serve_state'], 'error')
         self.assertFalse(self.status()['https_ready'])
+
+    def test_unresponsive_status_calls_are_bounded_and_controller_keeps_running(self):
+        timeout = shutil.which('timeout')
+        self.tool('timeout', f'''#!/bin/sh
+[ "$1" = --signal=TERM ] && [ "$2" = --kill-after=2s ] && [ "$3" = 10s ] || exit 99
+echo bounded >>"$TS_RUN_DIR/timeout.calls"
+shift 3
+exec "{timeout}" --signal=TERM --kill-after=0.1s 0.1s "$@"
+''')
+        controller = self.tailscale(stall_status=True)
+        self.assertEqual(controller.tick(False), 10)
+        self.assertEqual(self.status()['backend_state'], 'Unknown')
+        self.assertEqual(self.status()['serve_state'], 'waiting_for_login')
+        self.assertFalse(self.status()['https_ready'])
+        self.assertEqual(controller.tick(), 10)
+        self.assertIsNone(controller.process.poll())
+        self.assertGreaterEqual(self.count(self.work / 'timeout.calls'), 3)
 
 
 if __name__ == '__main__':

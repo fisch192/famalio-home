@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRelayTLSManager } from './relay-tls.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.FAMALIO_SETUP_DIR || '/data/setup';
@@ -155,28 +156,17 @@ async function invokeCert(dns) {
     const cert = fs.readFileSync(ctmp); const key = fs.readFileSync(ktmp);
     const parsed = new crypto.X509Certificate(cert);
     if (!parsed.checkHost(dns) || Date.parse(parsed.validTo) <= Date.now() + 24 * 3600_000) throw new Error('Tailscale certificate identity or validity is invalid.');
+    tls.createSecureContext({ key, cert, minVersion: 'TLSv1.2' });
     fs.chmodSync(ctmp, 0o600); fs.chmodSync(ktmp, 0o600); fs.renameSync(ctmp, CERT); fs.renameSync(ktmp, KEY);
     return true;
   } finally { for (const f of [ctmp, ktmp]) try { fs.unlinkSync(f); } catch {} }
 }
-let relayCertPromise = null;
+const relayTLS = createRelayTLSManager({ certFile: CERT, keyFile: KEY, requestCertificate: invokeCert });
 let activeRelayContext = null;
+let activeRelayPair = null;
 async function ensureRelayCert(ts) {
   if (!ts || ts.backend_state !== 'Running' || !safeDNS(ts.self_dns_name)) return false;
-  if (relayCertPromise) return relayCertPromise;
-  relayCertPromise = (async () => {
-    try {
-      const cert = new crypto.X509Certificate(fs.readFileSync(CERT));
-      const stat = fs.statSync(KEY);
-      if (cert.checkHost(ts.self_dns_name) && Date.parse(cert.validTo) > Date.now() + 30 * 86400_000 && (stat.mode & 0o077) === 0) {
-        const key = fs.readFileSync(KEY), certBytes = fs.readFileSync(CERT);
-        tls.createSecureContext({ key, cert: certBytes }); // Detect mismatched files left by an interrupted pair replacement.
-        return true;
-      }
-    } catch {}
-    await invokeCert(ts.self_dns_name); return true;
-  })();
-  try { return await relayCertPromise; } finally { relayCertPromise = null; }
+  return relayTLS.ensure(ts.self_dns_name);
 }
 async function tlsCheck(hostname, port, pathName, token) {
   const alias = await addonAlias();
@@ -390,10 +380,10 @@ async function handle(req, res) {
     return send(res, e.status || 502, { message: e.message || 'Setup action failed.' });
   }
 }
-function startRelay() {
-  const initialKey = fs.readFileSync(KEY), initialCert = fs.readFileSync(CERT);
-  activeRelayContext = tls.createSecureContext({ key: initialKey, cert: initialCert });
-  const server = https.createServer({ key: initialKey, cert: initialCert, minVersion: 'TLSv1.2', requestCert: false,
+function startRelay(pair) {
+  activeRelayContext = pair.context;
+  activeRelayPair = pair;
+  const server = https.createServer({ key: pair.key, cert: pair.cert, minVersion: 'TLSv1.2', requestCert: false,
     SNICallback: (servername, callback) => { const name = readJson(TS_STATUS)?.self_dns_name; if (!safeDNS(name) || servername !== name || !activeRelayContext) return callback(new Error('Unexpected TLS server name.')); callback(null, activeRelayContext); } }, (req, res) => {
     relayRequest(req, res).catch(() => { if (!res.headersSent) relayError(res, 502, 'Famalio API unavailable.'); else res.destroy(); });
   });
@@ -445,12 +435,12 @@ if (process.env.NODE_ENV !== 'test') {
     const ts = readJson(TS_STATUS);
     if (ts?.backend_state === 'Running' && ts.serve_state === 'active' && ts.https_ready === true && !globalThis.relayCertPending) {
       globalThis.relayCertPending = true;
-      ensureRelayCert(ts).then(() => {
-        if (!globalThis.relayServer) globalThis.relayServer = startRelay();
-        else {
-          const replacement = tls.createSecureContext({ key: fs.readFileSync(KEY), cert: fs.readFileSync(CERT) });
-          activeRelayContext = replacement;
-          globalThis.relayServer.setSecureContext({ key: fs.readFileSync(KEY), cert: fs.readFileSync(CERT) });
+      ensureRelayCert(ts).then(pair => {
+        if (!globalThis.relayServer) globalThis.relayServer = startRelay(pair);
+        else if (pair !== activeRelayPair) {
+          globalThis.relayServer.setSecureContext({ key: pair.key, cert: pair.cert, minVersion: 'TLSv1.2' });
+          activeRelayContext = pair.context;
+          activeRelayPair = pair;
         }
       }).catch(() => {}).finally(() => { globalThis.relayCertPending = false; });
     }
